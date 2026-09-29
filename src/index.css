@@ -1,0 +1,56 @@
+:root {
+  /* Цвета */
+  --color-bg: #0e0f12;
+  --color-surface: #141518;
+  --color-surface-raised: #1a1b1f;
+  --color-border: #27292e;
+  --color-text: #f5f6f8;
+  --color-text-secondary: #8d9099;
+  --color-text-muted: #5d6069;
+  --color-accent: #ff3838;
+  --color-success: #30c18b;
+
+  /* Шрифты */
+  --font-main: "Inter Tight", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --font-code: "Plus Jakarta Sans", sans-serif;
+
+  /* Размеры текста в шапке */
+  --font-size-header-city: 11px;
+  --font-size-header-time: 10px;
+  --font-size-header-link: 10px;
+  --font-size-logo: 25px;
+  --font-size-slogan: 11px;
+  --font-size-timer: 11px;
+  --font-size-progress: 8.5px;
+
+  /* Начертания и высота строки */
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+
+  /* Размеры и отступы шапки */
+  --page-padding-inline: 16px;
+  --border-width: 1px;
+  --header-status-dot-size: 7px;
+  --header-status-gap: 5px;
+  --header-code-width: 96px;
+  --header-code-height: 25px;
+  --header-code-radius: 4px;
+  --header-avatar-size: 28px;
+  --header-avatar-overlap: 9px;
+}
+
+#root {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 438px;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-main);
+}
