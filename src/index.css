@@ -1,6 +1,7 @@
 :root {
   /* Цвета */
-  --color-bg: #0e0f12;
+  /* --color-bg: #0e0f12; */
+  --color-bg: #000000;
   --color-surface: #141518;
   --color-surface-raised: #1a1b1f;
   --color-border: #27292e;
@@ -15,16 +16,26 @@
   --font-mono: "IBM Plex Mono", monospace;
   --font-code: "Plus Jakarta Sans", sans-serif;
 
-  /* Размеры текста в шапке */
+  /* Размеры текста */
   --font-size-header-city: 11px;
   --font-size-header-time: 10px;
   --font-size-header-link: 10px;
   --font-size-logo: 25px;
   --font-size-slogan: 11px;
-  --font-size-timer: 11px;
+  --font-size-timer: 10px;
   --font-size-progress: 8.5px;
+  --font-size-body: 15px;
+  --font-size-meta: 10px;
+  --font-size-action: 12px;
+
+  --button-height: 49px;
+  --button-radius: 5px;
+
+  --letter-spacing-eyebrow: 1.5px;
+  --letter-spacing-action: 1.2px;
 
   /* Начертания и высота строки */
+  --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
@@ -33,6 +44,8 @@
   /* Размеры и отступы шапки */
   --page-padding-inline: 16px;
   --border-width: 1px;
+
+  /* header*/
   --header-status-dot-size: 7px;
   --header-status-gap: 5px;
   --header-code-width: 96px;

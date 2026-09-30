@@ -7,31 +7,24 @@
 
 .header__top {
   display: grid;
+  padding-top: 13px;
+  padding-bottom: 10px;
   grid-template-columns: 1fr auto 1fr;
+
   justify-content: space-between;
   align-items: center;
-  border-bottom: solid var(--color-border) 1px;
-  padding-bottom: 8px;
-}
 
-.header__bottom {
-  display: flex;
-  justify-content: space-between;
-}
-
-.header__logo-slogan {
-  display: flex;
-  flex-direction: column;
-}
-
-.header__top__right {
-  justify-self: end;
+  border-bottom: solid var(--color-border) var(--border-width);
 }
 
 .header__top__left {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-semibold);
 
   &::before {
     content: '';
@@ -41,6 +34,28 @@
     background-color: var(--color-accent);
     flex-shrink: 0;
   }
+}
+
+.header__top__right {
+  box-sizing: border-box;
+
+  width: 96px;
+  height: 25px;
+
+  display: flex;
+  justify-self: end;
+  justify-content: center;
+  align-items: center;
+
+  border: solid var(--color-border) var(--border-width);
+  border-radius: var(--header-code-radius);
+
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-header-link);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: 1px;
 }
 
 .header__city-name {
@@ -53,12 +68,55 @@
 }
 
 .header__time {
-  align-items: center;
-  display: flex;
-  gap: 2px;
   font-size: var(--font-size-header-time);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
   letter-spacing: 0.3px;
   color: var(--color-text-secondary);
+}
+
+.header__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: solid var(--color-border) var(--border-width);
+}
+
+.header__logo-slogan {
+  display: flex;
+  flex-direction: column;
+}
+
+.header__logo {
+  font-size: var(--font-size-logo);
+  font-weight: var(--font-weight-bold);
+}
+
+.header__slogan {
+  font-size: var(--font-size-slogan);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.header__selecting-running {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+.header__selecting-running__timer {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-timer);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+}
+
+.header__selecting-running__progress {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-progress);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: 0.3px;
 }

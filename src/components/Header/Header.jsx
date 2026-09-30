@@ -1,24 +1,24 @@
 import "../../styles/header.css"
 
 function Header({
-  cityName, 
-  isSelecting, 
-  currentPlaceNumber,
-  totalPlaces,
-  remainingSeconds,
-  day,
-  time,
+  cityName, // если нет
+  selecting, // если идет голосование
+  currentPlaceNumber, // если идет голосование
+  totalPlaces, // если идет голосование
+  remainingSeconds, // если идет голосование
+  day, // если нет
+  time,// если нет
   showTopBrand, 
-  roomCode,
-  bottomRight}
+  roomCode, // если идет голосование
+  bottomRight} // можно всегда
 ) {
   function getDay() {
     return day === "tomorrow" ? "завтра" : "сегодня";
   }
 
   function renderTopLeft() {
-    if (isSelecting) {
-      return <span className="header__room-name">{`комната#${roomCode}`}</span>
+    if (selecting) {
+      return <span className="header__room-name">{`КОМНАТА #${roomCode}`}</span>
     } else {
       return <span className="header__city-name">{cityName.toUpperCase()}</span>
     }
@@ -33,28 +33,31 @@ function Header({
   }
 
   function renderTopCenter() {
-    if (isSelecting) {
+    if (selecting) {
       const cur = String(currentPlaceNumber).padStart(2, '0')
       const total = String(totalPlaces).padStart(2, '0')
       return (
         <div className="header__selecting-running">
-          <span>{secondsToMMSS()} ДО КОНЦА</span>
-          <span>место {cur} / {total}</span>
+          <span className="header__selecting-running__timer">
+            {secondsToMMSS()} ДО КОНЦА
+          </span>
+          <span className="header__selecting-running__progress">
+            МЕСТО {cur} / {total}
+          </span>
         </div>
       )
     } else {
       return (
-        <div className="header__time">
-          <span>{getDay()}</span>
-          <span>·</span>
-          <span>{time}</span>
-        </div>)
+        <span className="header__time"> 
+          {getDay().toUpperCase()} · {time}
+        </span>
+      )
     }
   }
 
   function renderTopRight() {
     if (showTopBrand) {
-      return <div className="header__brand">куда.</div>
+      return <div className="header__brand">КУДА.</div>
     } else {
       return <div className="header__room-code">КОД: {roomCode}</div>
     }
@@ -73,8 +76,8 @@ function Header({
       </div>
       <div className="header__bottom">
         <div className="header__logo-slogan"> 
-          <span>куда.</span>
-          <span>Выбираем место вместе</span>
+          <span className="header__logo">куда.</span>
+          <span className="header__slogan">Выбираем место вместе</span>
         </div>
         {bottomRight}
       </div>
