@@ -60,6 +60,9 @@ function HomePage() {
           ВОЙТИ ПО КОДУ
         </Link>
       </nav>
+      <span className="home-follow-link-offer">
+        ЕСТЬ ССЫЛКА? ОТКРОЙТЕ ЕЁ ИЗ СООБЩЕНИЯ
+      </span>
     </div>
   )
 }

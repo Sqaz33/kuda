@@ -20,21 +20,20 @@ function AppLayout() {
 
   return (
     <div className="app-layout">
-      {/* <Header
+      <Header
         cityName="Волгоград"
-        day="tomorrow"
+        day="today"
         time={getTime()}
         showTopBrand
-        bottomRight={(<span>right</span>)}
-      /> */}
-      <Header
+      />
+      {/* <Header
         selecting
         currentPlaceNumber={7}
         totalPlaces={12}
         remainingSeconds={time}
         roomCode={7001}
         bottomRight={(<span>right</span>)}
-      />
+      /> */}
       <main>
         <Outlet />
       </main>

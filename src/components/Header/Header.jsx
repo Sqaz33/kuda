@@ -13,7 +13,14 @@ function Header({
   bottomRight} // можно всегда
 ) {
   function getDay() {
-    return day === "tomorrow" ? "завтра" : "сегодня";
+    switch (day) {
+      case "tomorrow":
+        return "завтра"
+      case "today":
+        return "сегодня"
+      default:
+        return "сегодня"
+    }
   }
 
   function renderTopLeft() {
