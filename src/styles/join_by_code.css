@@ -1,0 +1,36 @@
+.join-by-code {
+  display: flex;
+  flex-direction: column;
+}
+
+.join-by-code__form {
+  display: flex;
+  flex-direction: column;
+}
+
+.join-by-code__form-code {
+  position: absolute;
+  width: 404px;
+  height: 110px;
+  background-color: var(--color-surface-raised);
+  border-radius: 6px;
+}
+
+.join-by-code__form-input {
+  position: relative;
+  inset: 0px;
+  opacity: 0;
+
+  padding: 0px;
+
+  border: none;
+
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  line-height: 1.15;
+  font-weight: var(--font-weight-bold);
+  font-size: 51px;
+
+  letter-spacing: 10px;
+  text-align: center;
+} 
