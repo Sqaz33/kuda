@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-const defaultBase = Platform.OS === 'android' ? 'http://10.0.2.2:8787' : 'http://localhost:8787';
+const defaultBase = Platform.OS === 'android' ? 'http://10.0.2.2:8787' : Platform.OS === 'web' ? 'http://127.0.0.1:8787' : 'http://localhost:8787';
 export const API_BASE = (process.env.EXPO_PUBLIC_API_URL || defaultBase).replace(/\/$/, '');
 let accessToken = null;
 
@@ -57,6 +57,7 @@ export async function request(path, { method = 'GET', body, idempotencyKey } = {
 
 export const api = {
   me: () => request('/v1/me'),
+  logout: () => request('/v1/auth/session', { method: 'DELETE' }),
   guest: (name) => request('/v1/auth/guest', { method: 'POST', body: { name } }),
   email: (mode, email, password, name) => request(`/v1/auth/email/${mode}`, { method: 'POST', body: { email, password, name } }),
   miniApp: (provider, initData) => request(`/v1/auth/${provider}`, { method: 'POST', body: { initData } }),
@@ -73,7 +74,9 @@ export const api = {
   }),
   finish: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/finish`, { method: 'POST', body: {} }),
   closeVoting: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/close-voting`, { method: 'POST', body: {} }),
+  extend: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/extend`, { method: 'POST', body: {} }),
   choose: (id, venueId) => request(`/v1/rooms/${encodeURIComponent(id)}/winner`, { method: 'PUT', body: { venueId } }),
   bookingNote: (id, note) => request(`/v1/rooms/${encodeURIComponent(id)}/booking-note`, { method: 'PUT', body: { note } }),
   report: (id, venueId, reason) => request(`/v1/rooms/${encodeURIComponent(id)}/reports`, { method: 'POST', body: { venueId, reason } }),
+  track: (name, properties = {}) => request('/v1/events', { method: 'POST', body: { name, properties } }),
 };
