@@ -1,51 +1,70 @@
 import { StyleSheet } from 'react-native';
 
+// Values from the Penpot page “MVP · дизайн Stitch, телефон и ПК”.
 export const colors = {
-  bg: '#12110F',
-  raised: '#1C1A17',
-  card: '#24211C',
-  text: '#F4F0E6',
-  secondary: '#A39B8E',
-  muted: '#777065',
-  border: '#363129',
-  accent: '#F0A05A',
-  accentPressed: '#D4843C',
-  onAccent: '#1A1814',
-  success: '#8FBF7A',
-  danger: '#E05A4F',
+  bg: '#000000',
+  surface: '#141518',
+  surfaceRaised: '#1A1B1F',
+  border: '#27292E',
+  borderStrong: '#34383E',
+  text: '#F5F6F8',
+  secondary: '#8D9099',
+  muted: '#5D6069',
+  red: '#FF3838',
+  green: '#30C18B',
+  primary: '#F5F6F8',
+  onPrimary: '#0E0F12',
 };
 
 export const fonts = {
-  regular: 'Manrope_400Regular',
-  medium: 'Manrope_500Medium',
-  semibold: 'Manrope_600SemiBold',
-  bold: 'Manrope_700Bold',
+  regular: 'InterTight_400Regular',
+  medium: 'InterTight_500Medium',
+  semibold: 'InterTight_600SemiBold',
+  bold: 'InterTight_700Bold',
+  mono: 'IBMPlexMono_600SemiBold',
+  monoBold: 'IBMPlexMono_700Bold',
+  number: 'PlusJakartaSans_700Bold',
 };
 
 export const common = StyleSheet.create({
-  h1: {
+  title: {
     color: colors.text,
     fontFamily: fonts.bold,
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.8,
+    fontSize: 32,
+    lineHeight: 37,
+    letterSpacing: -1.2,
   },
-  h2: {
+  heading: {
     color: colors.text,
     fontFamily: fonts.bold,
-    fontSize: 23,
-    lineHeight: 29,
+    fontSize: 22,
+    lineHeight: 28,
     letterSpacing: -0.4,
   },
-  h3: { color: colors.text, fontFamily: fonts.semibold, fontSize: 18, lineHeight: 25 },
-  body: { color: colors.text, fontFamily: fonts.medium, fontSize: 16, lineHeight: 24 },
-  small: { color: colors.secondary, fontFamily: fonts.medium, fontSize: 13, lineHeight: 19 },
-  eyebrow: {
-    color: colors.accent,
-    fontFamily: fonts.bold,
-    fontSize: 11,
+  body: {
+    color: colors.text,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  muted: {
+    color: colors.secondary,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    lineHeight: 19,
+  },
+  small: {
+    color: colors.secondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  label: {
+    color: colors.secondary,
+    fontFamily: fonts.mono,
+    fontSize: 10,
     lineHeight: 16,
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
 });

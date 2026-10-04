@@ -3,8 +3,8 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 const randomId = () => randomBytes(12).toString('base64url');
 const categories = ['cafe', 'restaurant', 'bar'];
 const names = [
-  'Тёплый двор',
-  'Линия вкуса',
+  'Neon Velvet',
+  'Соль и хлеб',
   'Тихий угол',
   'Встреча',
   'Пятый стол',
@@ -32,7 +32,8 @@ const names = [
 export const venues = names.map((name, index) => ({
   id: `venue-${index + 1}`,
   name,
-  category: categories[index % 3],
+  category: index === 0 ? 'bar' : categories[index % 3],
+  photoKey: index === 0 ? 'neon' : index === 1 ? 'salt' : null,
   cuisine: ['Европейская кухня', 'Авторская кухня', 'Кофе и десерты', 'Смешанная кухня'][index % 4],
   district: index < 20 ? 'Центральный' : 'Ворошиловский',
   address: `Волгоград, улица Мира, ${index + 3}`,

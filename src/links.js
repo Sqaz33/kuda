@@ -38,8 +38,16 @@ export async function shareInvite(token) {
         /* use copy */
       }
     }
-    await navigator.clipboard.writeText(link);
-    return 'copied';
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(link);
+        return 'copied';
+      } catch {
+        /* Local HTTP may not grant clipboard access. */
+      }
+    }
+    window.prompt('Скопируйте ссылку приглашения', link);
+    return 'shown';
   }
   await Share.share({ message: `Присоединяйся к выбору места: ${link}` });
   return 'shared';

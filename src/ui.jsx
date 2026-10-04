@@ -8,58 +8,61 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, common, fonts } from './theme';
-export function Screen({ children, aside, scroll = true }) {
-  const { width } = useWindowDimensions();
-  const content = (
-    <View style={[styles.columns, width >= 960 && styles.wide]}>
-      <View style={styles.primary}>{children}</View>
-      {width >= 960 && aside ? <View style={styles.aside}>{aside}</View> : null}
-    </View>
-  );
+
+export function Screen({ children, footer, scroll = true }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={styles.safe}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {scroll ? (
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
-            {content}
-          </ScrollView>
-        ) : (
-          content
-        )}
+        <View style={styles.shell}>
+          {scroll ? (
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={styles.content}>{children}</View>
+          )}
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
+
 export function Brand({ subtitle = 'Выбираем место вместе', right }) {
   return (
     <View style={styles.brandBar}>
       <View>
-        <Text style={styles.brand}>
-          куда<Text style={{ color: colors.accent }}>.</Text>
-        </Text>
+        <Text style={styles.brand}>куда.</Text>
         <Text style={styles.brandSubtitle}>{subtitle}</Text>
       </View>
       {right}
     </View>
   );
 }
+
 export function Eyebrow({ children, style }) {
-  return <Text style={[common.eyebrow, style]}>{children}</Text>;
+  return <Text style={[common.label, style]}>{children}</Text>;
 }
+
 export function Body({ children, muted = false, style }) {
-  return <Text style={[common.body, muted && { color: colors.secondary }, style]}>{children}</Text>;
+  return <Text style={[muted ? common.muted : common.body, style]}>{children}</Text>;
 }
+
 export function Card({ children, style }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
+
 export function Button({
   children,
   onPress,
@@ -69,11 +72,12 @@ export function Button({
   style,
   testID,
 }) {
+  const isDisabled = disabled || loading;
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      disabled={disabled || loading}
+      disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
@@ -81,19 +85,19 @@ export function Button({
         variant === 'secondary' && styles.secondaryButton,
         variant === 'quiet' && styles.quietButton,
         variant === 'danger' && styles.dangerButton,
-        (disabled || loading) && { opacity: 0.48 },
-        pressed && { opacity: 0.78 },
+        isDisabled && styles.disabled,
+        pressed && styles.pressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.onAccent : colors.text} />
+        <ActivityIndicator color={variant === 'primary' ? colors.onPrimary : colors.text} />
       ) : (
         <Text
           style={[
             styles.buttonText,
-            variant === 'primary' && { color: colors.onAccent },
-            variant === 'danger' && { color: colors.danger },
+            variant === 'primary' && styles.primaryButtonText,
+            variant === 'danger' && styles.dangerButtonText,
           ]}
         >
           {children}
@@ -102,6 +106,7 @@ export function Button({
     </Pressable>
   );
 }
+
 export function Field({ label, hint, error, ...props }) {
   return (
     <View style={styles.field}>
@@ -109,20 +114,21 @@ export function Field({ label, hint, error, ...props }) {
       <TextInput
         {...props}
         placeholderTextColor={colors.muted}
-        selectionColor={colors.accent}
+        selectionColor={colors.red}
         style={[
           styles.input,
-          props.multiline && { minHeight: 90, textAlignVertical: 'top' },
-          error && { borderColor: colors.danger },
+          props.multiline && styles.multiline,
+          error && styles.inputError,
           props.style,
         ]}
       />
       {error || hint ? (
-        <Text style={[common.small, error && { color: colors.danger }]}>{error || hint}</Text>
+        <Text style={[common.small, error && { color: colors.red }]}>{error || hint}</Text>
       ) : null}
     </View>
   );
 }
+
 export function Chips({ options, value, onChange, multiple = false }) {
   return (
     <View style={styles.chips}>
@@ -144,7 +150,7 @@ export function Chips({ options, value, onChange, multiple = false }) {
             }
             style={[styles.chip, selected && styles.selectedChip]}
           >
-            <Text style={[styles.chipText, selected && { color: colors.onAccent }]}>
+            <Text style={[styles.chipText, selected && styles.selectedChipText]}>
               {option.label}
             </Text>
           </Pressable>
@@ -153,107 +159,133 @@ export function Chips({ options, value, onChange, multiple = false }) {
     </View>
   );
 }
+
 export function Notice({ title, children, tone = 'neutral' }) {
   return (
-    <View
-      style={[
-        styles.notice,
-        tone === 'warning' && { borderColor: colors.accent },
-        tone === 'success' && { borderColor: colors.success },
-      ]}
-    >
-      {title ? <Text style={[common.h3, { marginBottom: 4 }]}>{title}</Text> : null}
-      <Text style={common.small}>{children}</Text>
+    <View style={styles.notice}>
+      {title ? (
+        <View style={styles.noticeTitleRow}>
+          <View style={[styles.noticeDot, tone === 'warning' && { backgroundColor: colors.red }]} />
+          <Text style={styles.noticeTitle}>{title}</Text>
+        </View>
+      ) : null}
+      {children ? <Text style={common.muted}>{children}</Text> : null}
     </View>
   );
 }
+
 export function Separator() {
   return <View style={styles.separator} />;
 }
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  scroll: { minHeight: '100%', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 36 },
-  columns: { width: '100%', alignSelf: 'center', maxWidth: 452, flexDirection: 'row', gap: 48 },
-  wide: { maxWidth: 824, paddingHorizontal: 24, justifyContent: 'center' },
-  primary: { flex: 1, minWidth: 0, maxWidth: 420 },
-  aside: { width: 300 },
+  shell: { flex: 1, width: '100%', maxWidth: 438, alignSelf: 'center' },
+  content: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },
+  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, backgroundColor: colors.bg },
   brandBar: {
+    minHeight: 65,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 18,
-    marginBottom: 28,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    marginBottom: 30,
   },
   brand: {
-    fontFamily: fonts.bold,
     color: colors.text,
-    fontSize: 26,
-    lineHeight: 29,
-    letterSpacing: -1.3,
+    fontFamily: fonts.bold,
+    fontSize: 25,
+    lineHeight: 27,
+    letterSpacing: -1,
   },
-  brandSubtitle: { color: colors.secondary, fontFamily: fonts.medium, fontSize: 11, marginTop: 2 },
+  brandSubtitle: {
+    color: colors.secondary,
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    lineHeight: 15,
+  },
   card: {
-    backgroundColor: colors.card,
-    borderWidth: 1,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: 20,
-    padding: 20,
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 18,
   },
   button: {
-    minHeight: 52,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 14,
+    minHeight: 49,
+    paddingHorizontal: 14,
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
   },
-  primaryButton: { backgroundColor: colors.accent },
-  secondaryButton: { backgroundColor: colors.raised, borderWidth: 1, borderColor: colors.border },
-  quietButton: { backgroundColor: 'transparent' },
-  dangerButton: { backgroundColor: colors.raised, borderWidth: 1, borderColor: colors.danger },
-  buttonText: { color: colors.text, fontFamily: fonts.bold, fontSize: 15, textAlign: 'center' },
-  field: { gap: 8, marginBottom: 18 },
-  fieldLabel: {
-    color: colors.secondary,
-    fontFamily: fonts.bold,
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  input: {
-    color: colors.text,
-    backgroundColor: colors.raised,
+  primaryButton: { backgroundColor: colors.primary },
+  secondaryButton: {
+    backgroundColor: colors.surface,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 14,
-    minHeight: 52,
-    paddingHorizontal: 16,
+  },
+  quietButton: { backgroundColor: 'transparent' },
+  dangerButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.red },
+  disabled: { opacity: 0.45 },
+  pressed: { opacity: 0.8 },
+  buttonText: {
+    color: colors.text,
+    fontFamily: fonts.monoBold,
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: 0.7,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  primaryButtonText: { color: colors.onPrimary },
+  dangerButtonText: { color: colors.red },
+  field: { gap: 10, marginBottom: 20 },
+  fieldLabel: { ...common.label },
+  input: {
+    minHeight: 54,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 5,
+    backgroundColor: colors.surface,
+    color: colors.text,
     fontFamily: fonts.medium,
     fontSize: 16,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, marginBottom: 14 },
+  multiline: { minHeight: 88, textAlignVertical: 'top', paddingTop: 12 },
+  inputError: { borderColor: colors.red },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    minHeight: 40,
-    borderRadius: 24,
-    backgroundColor: colors.raised,
-    borderColor: colors.border,
-    borderWidth: 1,
-    paddingHorizontal: 15,
-    alignItems: 'center',
+    minHeight: 27,
+    paddingHorizontal: 14,
     justifyContent: 'center',
-  },
-  selectedChip: { backgroundColor: colors.accent, borderColor: colors.accent },
-  chipText: { color: colors.text, fontFamily: fonts.semibold, fontSize: 13 },
-  notice: {
-    padding: 16,
-    borderRadius: 14,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.raised,
-    marginVertical: 10,
+    borderRadius: 3,
+    backgroundColor: colors.surface,
   },
-  separator: { height: 1, backgroundColor: colors.border, marginVertical: 18 },
+  selectedChip: { borderColor: colors.red },
+  chipText: {
+    color: colors.secondary,
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  selectedChipText: { color: colors.text },
+  notice: {
+    gap: 18,
+    marginVertical: 10,
+    padding: 18,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  noticeTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  noticeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.green },
+  noticeTitle: { color: colors.text, fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.7 },
+  separator: { height: 1, backgroundColor: colors.border, marginVertical: 17 },
 });

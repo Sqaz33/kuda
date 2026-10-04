@@ -5,7 +5,7 @@ const defaultBase =
   Platform.OS === 'android'
     ? 'http://10.0.2.2:8787'
     : Platform.OS === 'web'
-      ? 'http://127.0.0.1:8787'
+      ? `http://${window.location.hostname}:8787`
       : 'http://localhost:8787';
 export const API_BASE = (process.env.EXPO_PUBLIC_API_URL || defaultBase).replace(/\/$/, '');
 let accessToken = null;

@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import {
-  useFonts,
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
-} from '@expo-google-fonts/manrope';
+import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { api, hasToken, loadToken, saveToken } from './src/api';
 import { inviteFromUrl, shareInvite } from './src/links';
@@ -42,10 +36,13 @@ function roomScreen(room) {
 
 export default function App() {
   const [loaded] = useFonts({
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
+    InterTight_400Regular: require('@expo-google-fonts/inter-tight/400Regular/InterTight_400Regular.ttf'),
+    InterTight_500Medium: require('@expo-google-fonts/inter-tight/500Medium/InterTight_500Medium.ttf'),
+    InterTight_600SemiBold: require('@expo-google-fonts/inter-tight/600SemiBold/InterTight_600SemiBold.ttf'),
+    InterTight_700Bold: require('@expo-google-fonts/inter-tight/700Bold/InterTight_700Bold.ttf'),
+    IBMPlexMono_600SemiBold: require('@expo-google-fonts/ibm-plex-mono/600SemiBold/IBMPlexMono_600SemiBold.ttf'),
+    IBMPlexMono_700Bold: require('@expo-google-fonts/ibm-plex-mono/700Bold/IBMPlexMono_700Bold.ttf'),
+    PlusJakartaSans_700Bold: require('@expo-google-fonts/plus-jakarta-sans/700Bold/PlusJakartaSans_700Bold.ttf'),
   });
   const [screen, setScreen] = useState('loading');
   const [user, setUser] = useState(null);
@@ -336,7 +333,7 @@ export default function App() {
   if (screen === 'loading' || !loaded)
     content = (
       <View style={styles.loading}>
-        <ActivityIndicator color={colors.accent} size="large" />
+        <ActivityIndicator color={colors.red} size="large" />
       </View>
     );
   else if (screen === 'home')
@@ -413,6 +410,7 @@ export default function App() {
         onBack={goHome}
         onFinish={closeVoting}
         onCancel={cancelRoom}
+        onRefresh={() => openRoom(room.id)}
       />
     );
   else if (screen === 'matches' && room)
@@ -487,8 +485,8 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     bottom: 22,
-    backgroundColor: colors.card,
-    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    borderColor: colors.red,
     borderWidth: 1,
     padding: 16,
     borderRadius: 14,
@@ -499,7 +497,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.danger,
+    backgroundColor: colors.red,
     alignItems: 'center',
     padding: 6,
   },
