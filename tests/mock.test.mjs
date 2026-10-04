@@ -65,8 +65,58 @@ test('matching names an incomplete fallback instead of inventing consensus', () 
   );
 });
 
+test('demo guests are added only when a room is created and finish random voting', async (t) => {
+  const server = createMockServer({ demoParticipants: 2 });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  async function call(method, path, body, token) {
+    const response = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, data: await response.json() };
+  }
+
+  const host = (await call('POST', '/v1/auth/guest', { name: 'Ведущий' })).data;
+  const roomConstraints = { ...constraints, partySize: 4 };
+  const created = (await call('POST', '/v1/rooms', { constraints: roomConstraints }, host.token))
+    .data;
+  assert.equal(created.members.length, 3);
+  assert.equal(created.members.filter((member) => member.isDemo).length, 2);
+  assert.ok(created.members.filter((member) => member.isDemo).every((member) => !member.finished));
+
+  const started = (await call('POST', `/v1/rooms/${created.id}/start`, {}, host.token)).data;
+  assert.equal(started.status, 'swiping');
+  assert.ok(started.members.filter((member) => member.isDemo).every((member) => member.finished));
+  for (const venue of started.candidates) {
+    await call(
+      'PUT',
+      `/v1/rooms/${created.id}/votes`,
+      { venueId: venue.id, value: 'like' },
+      host.token,
+    );
+  }
+  const decided = (await call('GET', `/v1/rooms/${created.id}`, null, host.token)).data;
+  assert.equal(decided.status, 'deciding');
+  assert.ok(decided.matches.length > 0);
+  assert.equal(decided.matches[0].total, 3);
+
+  const another = (await call('POST', '/v1/rooms', { constraints: roomConstraints }, host.token))
+    .data;
+  const guest = (await call('POST', '/v1/auth/guest', { name: 'Гость' })).data;
+  const joined = (await call('POST', `/v1/invites/${another.inviteToken}/join`, {}, guest.token))
+    .data;
+  assert.equal(joined.members.length, 4);
+  assert.equal(joined.members.filter((member) => member.isDemo).length, 2);
+});
+
 test('two clients share a fixed deck, idempotent votes and a final result', async (t) => {
-  const server = createMockServer();
+  const server = createMockServer({ demoParticipants: 0 });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -161,7 +211,7 @@ test('two clients share a fixed deck, idempotent votes and a final result', asyn
 });
 
 test('rotated invitation stops working and cancellation has a clear state', async (t) => {
-  const server = createMockServer();
+  const server = createMockServer({ demoParticipants: 0 });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -187,7 +237,7 @@ test('rotated invitation stops working and cancellation has a clear state', asyn
 });
 
 test('a participant can finish after ten votes and cannot add more', async (t) => {
-  const server = createMockServer();
+  const server = createMockServer({ demoParticipants: 0 });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.address().port}`;

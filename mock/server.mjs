@@ -88,6 +88,16 @@ function maybeExpire(room) {
   )
     room.status = 'expired';
 }
+function voteForDemoMembers(room, candidates) {
+  for (const member of room.members.filter((item) => item.isDemo)) {
+    room.votes[member.id] ||= {};
+    for (const venue of candidates) {
+      room.votes[member.id][venue.id] = Math.random() < 0.6 ? 'like' : 'dislike';
+    }
+    member.finished = true;
+    member.status = 'finished';
+  }
+}
 function rateLimit(request) {
   const key = request.socket.remoteAddress || 'local';
   const now = Date.now();
@@ -126,7 +136,7 @@ function mergeIdentity(source, account) {
   store.users.set(source.id, account);
 }
 
-export async function handle(request, response) {
+export async function handle(request, response, { demoParticipants = 2 } = {}) {
   if (request.method === 'OPTIONS') {
     send(response, 204, null);
     return;
@@ -254,7 +264,11 @@ export async function handle(request, response) {
         fail(422, 'INVALID_CONSTRAINTS', 'Проверь условия встречи.');
       if (catalog(constraints).length < 12)
         fail(409, 'NOT_ENOUGH_VENUES', 'Подходящих мест меньше 12. Расширь поиск.');
-      return send(response, 201, store.serialize(store.createRoom(user, constraints), user));
+      return send(
+        response,
+        201,
+        store.serialize(store.createRoom(user, constraints, demoParticipants), user),
+      );
     }
     if (request.method === 'GET' && path === '/v1/rooms') {
       const user = auth(request);
@@ -324,6 +338,7 @@ export async function handle(request, response) {
         room.members.forEach((member) => {
           member.status = 'swiping';
         });
+        voteForDemoMembers(room, room.candidates);
         return send(response, 200, store.serialize(room, user));
       }
       if (request.method === 'POST' && action === 'rotate-invite') {
@@ -416,6 +431,7 @@ export async function handle(request, response) {
           member.finished = false;
           member.status = 'swiping';
         });
+        voteForDemoMembers(room, more);
         return send(response, 200, store.serialize(room, user));
       }
       if (request.method === 'PUT' && action === 'winner') {
@@ -466,8 +482,10 @@ export async function handle(request, response) {
   }
 }
 
-export function createMockServer() {
-  return http.createServer(handle);
+export function createMockServer({
+  demoParticipants = Number(process.env.MOCK_DEMO_PARTICIPANTS ?? 2),
+} = {}) {
+  return http.createServer((request, response) => handle(request, response, { demoParticipants }));
 }
 
 if (

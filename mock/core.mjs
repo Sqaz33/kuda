@@ -191,7 +191,12 @@ export function createMemoryStore() {
     );
     return code;
   }
-  function createRoom(host, constraints) {
+  function createRoom(host, constraints, demoParticipantCount = 0) {
+    const demoNames = ['Миша · тест', 'Лиза · тест'];
+    const count = Math.max(
+      0,
+      Math.min(Math.floor(demoParticipantCount) || 0, demoNames.length, constraints.partySize - 1),
+    );
     const room = {
       id: randomId(),
       code: makeCode(),
@@ -205,7 +210,16 @@ export function createMemoryStore() {
       expiresAt: new Date(
         Date.parse(`${constraints.date}T${constraints.time}:00+03:00`) + 6 * 3600000,
       ).toISOString(),
-      members: [{ id: host.id, name: host.name, status: 'waiting', finished: false }],
+      members: [
+        { id: host.id, name: host.name, status: 'waiting', finished: false },
+        ...demoNames.slice(0, count).map((name) => ({
+          id: `demo:${randomId()}`,
+          name,
+          status: 'waiting',
+          finished: false,
+          isDemo: true,
+        })),
+      ],
       candidates: [],
       votes: {},
       matches: [],
