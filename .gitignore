@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.expo
+web-build
+*.tsbuildinfo
 dist
 dist-ssr
 *.local

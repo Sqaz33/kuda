@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Куда",
+    "slug": "kuda",
+    "scheme": "kuda",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#12110F"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.kuda.mobile"
+    },
+    "android": {
+      "package": "app.kuda.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#12110F"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "Куда — выбираем место вместе"
+    },
+    "experiments": {
+      "tsconfigPaths": true
+    }
+  }
+}
