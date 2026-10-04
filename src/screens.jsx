@@ -67,12 +67,13 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
   </Screen>;
 }
 
-function localDate(offsetDays = 0) { const date = new Date(); date.setDate(date.getDate() + offsetDays); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+function volgogradParts(date) { return Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Volgograd', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(({ type, value }) => [type, value])); }
+function localDate(offsetDays = 0) { const parts = volgogradParts(new Date(Date.now() + offsetDays * 86400000)); return `${parts.year}-${parts.month}-${parts.day}`; }
 
 export function CreateScreen({ user, onBack, onCreate, busy }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(user?.name || '');
-  const [date, setDate] = useState(localDate(new Date().getHours() >= 19 ? 1 : 0));
+  const [date, setDate] = useState(localDate(Number(volgogradParts(new Date()).hour) >= 19 ? 1 : 0));
   const [time, setTime] = useState('19:00');
   const [areaMode, setAreaMode] = useState('district');
   const [district, setDistrict] = useState('Центральный');
@@ -86,8 +87,8 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
   const [expanded, setExpanded] = useState(false);
   const [estimate, setEstimate] = useState(null);
   const [estimateError, setEstimateError] = useState('');
-  const constraints = { city: 'Волгоград', date, time, area: areaMode === 'district' ? { type: 'district', district } : { type: 'radius', pointAddress: pointAddress.trim(), radiusKm: Number(radiusKm) }, categories: selectedCategories, budgetMax: Number(budgetMax), partySize: Number(partySize), deadlineMinutes: Number(deadlineMinutes), exclusions: exclusions.trim() ? exclusions.split(',').map((item) => item.trim()).filter(Boolean) : [] };
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(new Date(`${date}T${time}:00`).getTime()) && new Date(`${date}T${time}:00`).getTime() > Date.now();
+  const constraints = { city: 'Волгоград', timeZone: 'Europe/Volgograd', date, time, area: areaMode === 'district' ? { type: 'district', district } : { type: 'radius', pointAddress: pointAddress.trim(), radiusKm: Number(radiusKm) }, categories: selectedCategories, budgetMax: Number(budgetMax), partySize: Number(partySize), deadlineMinutes: Number(deadlineMinutes), exclusions: exclusions.trim() ? exclusions.split(',').map((item) => item.trim()).filter(Boolean) : [] };
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date) && /^\d{2}:\d{2}$/.test(time) && !Number.isNaN(Date.parse(`${date}T${time}:00+03:00`)) && Date.parse(`${date}T${time}:00+03:00`) > Date.now();
   const stepValid = step === 0 ? validDate : step === 1 ? areaMode === 'district' || pointAddress.trim().length >= 3 : step === 2 ? selectedCategories.length > 0 && Number(budgetMax) >= 300 : Number(partySize) >= 2 && Number(partySize) <= 12 && Number(deadlineMinutes) >= 5 && Number(deadlineMinutes) <= 120 && (user || name.trim().length >= 2);
   async function next() {
     if (step < 3) { setStep(step + 1); return; }
@@ -123,14 +124,14 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
   </Screen>;
 }
 
-export function PreviewScreen({ preview, user, onBack, onJoin, onResult, busy }) {
+export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
   const [name, setName] = useState(user?.name || '');
   const room = preview.room;
   const blocked = ['cancelled', 'expired', 'full', 'invalid', 'removed'].includes(preview.access);
   return <Screen><PageHead title={preview.access === 'selected' ? 'Место уже выбрали.' : blocked ? 'Сейчас войти не получится.' : `${room.hostName} зовёт на вечер.`} caption="ПРИГЛАШЕНИЕ" onBack={onBack} />
     <Card><Eyebrow>ПЛАН ВЕЧЕРА</Eyebrow><Text style={[common.h2, { marginTop: 14 }]}>{meeting(room.constraints)}</Text><Body muted style={{ marginTop: 8 }}>{room.constraints.city} · {room.constraints.area.type === 'district' ? room.constraints.area.district : room.constraints.area.pointAddress}</Body><Separator />
       <Body>{room.members.length} из {room.constraints.partySize} уже в комнате</Body><Body muted>{money(room.constraints.budgetMax)} · {room.constraints.categories.map((c) => categories.find((x) => x.value === c)?.label || c).join(', ')}</Body></Card>
-    {preview.access === 'selected' ? <Button onPress={onResult}>Посмотреть итог</Button> : blocked ? <><Notice title="Приглашение недоступно" tone="warning">{preview.reason || 'Комната закрыта или ссылка больше не действует.'}</Notice><Button variant="secondary" onPress={onBack}>Создать свой выбор</Button></> : <>
+    {preview.access === 'selected' ? <><Card style={{ marginTop: 18 }}><Eyebrow>ИТОГ ВЕЧЕРА</Eyebrow><Text style={[common.h2, { marginTop: 10 }]}>{room.winner?.name || 'Место уточняется'}</Text><Body muted>{room.winner?.address}</Body><Separator /><Body>{room.bookingNote === 'booked_by_host' ? 'Организатор отметил бронь столика.' : room.bookingNote === 'walk_in' ? 'Компания идёт без брони.' : 'Бронь пока не отмечена.'}</Body></Card>{room.winner?.mapUrl ? <Button variant="secondary" onPress={() => Linking.openURL(room.winner.mapUrl)}>Построить маршрут</Button> : null}</> : blocked ? <><Notice title="Приглашение недоступно" tone="warning">{preview.reason || 'Комната закрыта или ссылка больше не действует.'}</Notice><Button variant="secondary" onPress={onBack}>Создать свой выбор</Button></> : <>
       {!user ? <Field label="Как тебя зовут" value={name} onChangeText={setName} placeholder="Имя для компании" style={{ marginTop: 18 }} /> : null}
       <Button disabled={!user && name.trim().length < 2} loading={busy} onPress={() => onJoin(name.trim())}>Присоединиться</Button>
       <Text style={[common.small, { marginTop: 16 }]}>Для входа достаточно имени. Приложение устанавливать не нужно.</Text>
@@ -140,8 +141,14 @@ export function PreviewScreen({ preview, user, onBack, onJoin, onResult, busy })
 
 function MemberList({ members, hostId }) { return <View>{members.map((member) => <View style={styles.member} key={member.id}><View style={styles.avatar}><Text style={styles.avatarText}>{member.name.slice(0, 1).toUpperCase()}</Text></View><View style={{ flex: 1 }}><Text style={common.body}>{member.name} {member.id === hostId ? '· зовёт' : ''}</Text><Text style={common.small}>{member.finished ? 'Закончил выбор' : member.status === 'swiping' ? 'Выбирает места' : 'В комнате'}</Text></View></View>)}</View>; }
 
-export function LobbyScreen({ room, user, onBack, onStart, onShare, busy }) {
+function CloseRoomControl({ onCancel }) {
+  const [confirm, setConfirm] = useState(false);
+  return <View style={{ marginTop: 24 }}>{confirm ? <><Notice tone="warning">Комната закроется для всех участников.</Notice><Button variant="danger" onPress={onCancel}>Да, закрыть комнату</Button><Button variant="quiet" onPress={() => setConfirm(false)}>Оставить комнату</Button></> : <Button variant="quiet" onPress={() => setConfirm(true)}>Закрыть комнату</Button>}</View>;
+}
+
+export function LobbyScreen({ room, user, onBack, onStart, onShare, onRotate, onCancel, busy }) {
   const host = isHost(room, user);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   return <Screen aside={<Card><Eyebrow>КОМНАТА #{room.code}</Eyebrow><Text style={[common.h2, { marginTop: 14 }]}>Всем достанется одна колода.</Text><Body muted style={{ marginTop: 12 }}>Голоса других скрыты до окончания раунда. Итог будет одинаков на каждом устройстве.</Body></Card>}>
     <PageHead title="Ждём компанию." caption="КОМНАТА ОЖИДАНИЯ" onBack={onBack} room={room} />
     <Card><Eyebrow>КОГДА И ГДЕ</Eyebrow><Text style={[common.h2, { marginTop: 12 }]}>{meeting(room.constraints)}</Text><Body muted>{room.constraints.city} · {room.constraints.area.type === 'district' ? room.constraints.area.district : room.constraints.area.pointAddress}</Body><Separator /><Body>{money(room.constraints.budgetMax)} · {room.constraints.partySize} человек</Body></Card>
@@ -149,6 +156,8 @@ export function LobbyScreen({ room, user, onBack, onStart, onShare, busy }) {
     {host ? <Button variant="secondary" onPress={onShare}>Позвать друзей</Button> : null}
     <Text style={[common.small, styles.center, { marginTop: 10 }]}>Код комнаты: {room.code}</Text>
     {host ? <><Button disabled={room.members.length < 2} loading={busy} onPress={onStart}>Начать выбор</Button>{room.members.length < 2 ? <Text style={[common.small, styles.center]}>Нужно минимум два участника.</Text> : null}</> : <Notice>Когда организатор начнёт выбор, здесь появятся карточки заведений.</Notice>}
+    {host ? <><Separator /><Button variant="quiet" onPress={onRotate}>Заменить ссылку приглашения</Button><Text style={common.small}>После замены старая ссылка перестанет работать.</Text>
+      {confirmCancel ? <><Notice tone="warning">Комната закроется для всех участников. Отменить это действие в приложении нельзя.</Notice><Button variant="danger" loading={busy} onPress={onCancel}>Да, закрыть комнату</Button><Button variant="quiet" onPress={() => setConfirmCancel(false)}>Оставить комнату</Button></> : <Button variant="quiet" onPress={() => setConfirmCancel(true)}>Закрыть комнату</Button>}</> : null}
   </Screen>;
 }
 
@@ -160,11 +169,11 @@ function VenueFace({ venue, onDetail, compact = false }) { return <Card style={s
     <Button variant="quiet" onPress={onDetail}>Адрес и детали →</Button>
   </View></Card>; }
 
-export function DeckScreen({ room, user, onBack, onVote, onFinish, onDetail, pending }) {
+export function DeckScreen({ room, user, onBack, onVote, onFinish, onFinishEarly, onDetail, onCancel, pending }) {
   const votes = room.ownVotes || {};
   const current = room.candidates.find((venue) => !votes[venue.id]);
   const done = Object.keys(votes).length;
-  if (!current) return <WaitingScreen room={room} user={user} onBack={onBack} onFinish={onFinish} />;
+  if (!current) return <WaitingScreen room={room} user={user} onBack={onBack} onFinish={onFinish} onCancel={onCancel} />;
   return <Screen aside={<Card><Eyebrow>КАК ВЫБИРАТЬ</Eyebrow><Text style={[common.h2, { marginTop: 14 }]}>Только твой ответ.</Text><Body muted style={{ marginTop: 12 }}>Кнопки «Подходит» и «Не подходит» работают на телефоне и компьютере. Другие голоса станут видны в сумме после раунда.</Body></Card>}>
     <PageHead title="Куда пойдём?" caption={`${done + 1} / ${room.candidates.length} МЕСТ`} onBack={onBack} room={room} />
     <View style={styles.progressOuter}><View style={[styles.progressInner, { width: `${Math.round(done / room.candidates.length * 100)}%` }]} /></View>
@@ -172,19 +181,22 @@ export function DeckScreen({ room, user, onBack, onVote, onFinish, onDetail, pen
     <VenueFace venue={current} onDetail={() => onDetail(current)} compact />
     <View style={styles.voteActions}><Button variant="secondary" style={{ flex: 1 }} disabled={pending} onPress={() => onVote(current.id, 'dislike')}>Не подходит</Button><Button style={{ flex: 1 }} loading={pending} onPress={() => onVote(current.id, 'like')}>Подходит</Button></View>
     <Text style={[common.small, styles.center, { marginTop: 12 }]}>Голоса друзей пока скрыты.</Text>
+    {done >= 10 ? <Button variant="quiet" disabled={pending} onPress={onFinishEarly}>Закончить выбор сейчас</Button> : null}
+    {isHost(room, user) ? <CloseRoomControl onCancel={onCancel} /> : null}
   </Screen>;
 }
 
-export function WaitingScreen({ room, user, onBack, onFinish }) {
+export function WaitingScreen({ room, user, onBack, onFinish, onCancel }) {
   const finished = room.members.filter((m) => m.finished).length;
   return <Screen><PageHead title="Твой выбор готов." caption="ЖДЁМ ОСТАЛЬНЫХ" onBack={onBack} room={room} />
     <Card><Text style={common.h2}>{finished} из {room.members.length} закончили</Text><Body muted style={{ marginTop: 12 }}>Когда все ответят или истечёт время, покажем общее. Личные голоса других участников скрыты.</Body></Card>
     <Text style={[common.h3, { marginTop: 28 }]}>Компания</Text><MemberList members={room.members} hostId={room.hostId} />
     {isHost(room, user) && Date.now() >= Date.parse(room.deadlineAt) ? <Button variant="secondary" onPress={onFinish}>Подвести итог</Button> : <Notice>Экран обновится сам, когда все закончат или истечёт время голосования.</Notice>}
+    {isHost(room, user) ? <CloseRoomControl onCancel={onCancel} /> : null}
   </Screen>;
 }
 
-export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend }) {
+export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend, onCancel }) {
   const host = isHost(room, user);
   const matches = room.matches || [];
   const title = room.matchMode === 'unanimous' ? 'Вот что совпало.' : room.matchMode === 'majority' ? 'Нашлось большинство.' : 'Выберем из лучших.';
@@ -194,6 +206,7 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend 
     {matches.length ? matches.map((match, index) => <Card key={match.venue.id} style={{ marginTop: 12 }}><Eyebrow>ВАРИАНТ {index + 1}</Eyebrow><Text style={[common.h2, { marginTop: 10 }]}>{match.venue.name}</Text><Body muted>{match.venue.category} · {match.venue.district}</Body><Text style={[common.body, { color: colors.success, marginTop: 12 }]}>{match.likes} из {match.total} выбрали</Text>{host ? <Button loading={pending} onPress={() => onChoose(match.venue.id)}>Выбрать это место</Button> : null}</Card>) : <Notice title="Пока нет подходящего варианта" tone="warning">Можно расширить поиск и добавить новые места в общую колоду.</Notice>}
     {!matches.length && host ? <Button onPress={onExtend}>Добавить кандидатов</Button> : null}
     {!host ? <Text style={[common.small, { marginTop: 20 }]}>Организатор подтвердит одно место. Итог сразу появится у всех.</Text> : null}
+    {host ? <CloseRoomControl onCancel={onCancel} /> : null}
   </Screen>;
 }
 

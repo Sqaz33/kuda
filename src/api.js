@@ -69,6 +69,8 @@ export const api = {
   rooms: () => request('/v1/rooms'),
   room: (id) => request(`/v1/rooms/${encodeURIComponent(id)}`),
   start: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/start`, { method: 'POST', body: {} }),
+  rotateInvite: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/rotate-invite`, { method: 'POST', body: {} }),
+  cancelRoom: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
   vote: (id, venueId, value, userId) => request(`/v1/rooms/${encodeURIComponent(id)}/votes`, {
     method: 'PUT', body: { venueId, value }, idempotencyKey: `vote:${id}:${userId}:${venueId}`,
   }),

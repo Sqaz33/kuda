@@ -122,7 +122,10 @@ export default function App() {
     const joined = await api.join(preview.token); applyRoom(joined); void api.track('member_joined', { roomId: joined.id }).catch(() => {});
   }); }
   async function startRoom() { await run(async () => { applyRoom(await api.start(room.id)); void api.track('voting_started', { roomId: room.id }).catch(() => {}); }); }
+  async function rotateInvite() { await run(async () => { applyRoom(await api.rotateInvite(room.id)); setError('Новая ссылка готова. Старую уже нельзя использовать.'); }); }
+  async function cancelRoom() { await run(async () => { applyRoom(await api.cancelRoom(room.id)); }); }
   async function vote(venueId, value) { await run(async () => { applyRoom(await api.vote(room.id, venueId, value, user.id)); }); }
+  async function finishEarly() { await run(async () => { applyRoom(await api.finish(room.id)); }); }
   async function closeVoting() { await run(async () => { const next = await api.closeVoting(room.id); applyRoom(next); void api.track('voting_finished', { roomId: room.id, mode: next.matchMode }).catch(() => {}); }); }
   async function choose(venueId) { await run(async () => { applyRoom(await api.choose(room.id, venueId)); void api.track('winner_selected', { roomId: room.id, venueId }).catch(() => {}); }); }
   async function note(value) { await run(async () => { applyRoom(await api.bookingNote(room.id, value)); }); }
@@ -139,14 +142,14 @@ export default function App() {
   else if (screen === 'account') content = <AccountScreen user={user} onBack={goHome} onLogout={logout} onAuth={() => setScreen('auth')} />;
   else if (screen === 'create') content = <CreateScreen user={user} onBack={goHome} onCreate={createRoom} busy={busy} />;
   else if (screen === 'join') content = <JoinCodeScreen onBack={goHome} onLookup={lookupCode} busy={busy} />;
-  else if (screen === 'preview' && preview) content = <PreviewScreen preview={preview} user={user} onBack={goHome} onJoin={joinRoom} onResult={() => applyRoom(preview.room)} busy={busy} />;
-  else if (screen === 'lobby' && room) content = <LobbyScreen room={room} user={user} onBack={goHome} onStart={startRoom} onShare={share} busy={busy} />;
-  else if (screen === 'deck' && room) content = <DeckScreen room={room} user={user} onBack={goHome} onVote={vote} onFinish={closeVoting} onDetail={details} pending={busy} />;
-  else if (screen === 'waiting' && room) content = <WaitingScreen room={room} user={user} onBack={goHome} onFinish={closeVoting} />;
-  else if (screen === 'matches' && room) content = <MatchesScreen room={room} user={user} onChoose={choose} onBack={goHome} onExtend={extend} pending={busy} />;
+  else if (screen === 'preview' && preview) content = <PreviewScreen preview={preview} user={user} onBack={goHome} onJoin={joinRoom} busy={busy} />;
+  else if (screen === 'lobby' && room) content = <LobbyScreen room={room} user={user} onBack={goHome} onStart={startRoom} onShare={share} onRotate={rotateInvite} onCancel={cancelRoom} busy={busy} />;
+  else if (screen === 'deck' && room) content = <DeckScreen room={room} user={user} onBack={goHome} onVote={vote} onFinish={closeVoting} onFinishEarly={finishEarly} onDetail={details} onCancel={cancelRoom} pending={busy} />;
+  else if (screen === 'waiting' && room) content = <WaitingScreen room={room} user={user} onBack={goHome} onFinish={closeVoting} onCancel={cancelRoom} />;
+  else if (screen === 'matches' && room) content = <MatchesScreen room={room} user={user} onChoose={choose} onBack={goHome} onExtend={extend} onCancel={cancelRoom} pending={busy} />;
   else if (screen === 'result' && room) content = <ResultScreen room={room} user={user} onBack={goHome} onNote={note} onDetail={details} onAction={openAction} pending={busy} />;
   else if (screen === 'details' && venue) content = <DetailsScreen venue={venue} onBack={() => setScreen(room ? roomScreen(room) : returnTo)} onReport={report} pending={busy} />;
-  else content = <UnavailableScreen reason={error || 'Комната закрыта или срок встречи прошёл.'} onHome={goHome} />;
+  else content = <UnavailableScreen reason={error || (room?.status === 'cancelled' ? 'Организатор закрыл эту комнату.' : room?.status === 'expired' ? 'Время встречи прошло.' : 'Комната закрыта или срок встречи прошёл.')} onHome={goHome} />;
   return <SafeAreaProvider><StatusBar style="light" />{content}{screen !== 'loading' && error && screen !== 'unavailable' ? <Pressable onPress={() => setError('')} style={styles.toast}><Text style={styles.toastText}>{error}  ×</Text></Pressable> : null}{offline ? <View style={styles.offline}><Text style={styles.offlineText}>Нет связи. Данные обновятся автоматически.</Text></View> : null}</SafeAreaProvider>;
 }
 
