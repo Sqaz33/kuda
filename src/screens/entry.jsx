@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     fontSize: 46,
     textAlign: 'center',
   },
-  codeDigitEmpty: { color: colors.muted },
+  codeDigitEmpty: { color: colors.muted, transform: [{ translateY: 25 }] },
   whatNext: { marginTop: 54 },
   inviteCard: {
     backgroundColor: colors.surface,
