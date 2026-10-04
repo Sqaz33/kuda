@@ -39,13 +39,17 @@ export function Screen({ children, footer, scroll = true }) {
   );
 }
 
-export function Brand({ subtitle = 'Выбираем место вместе', right }) {
+export function Brand({ subtitle = 'Выбираем место вместе', right, onPress }) {
   return (
     <View style={styles.brandBar}>
-      <View>
+      <Pressable
+        onPress={onPress}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+      >
         <Text style={styles.brand}>куда.</Text>
         <Text style={styles.brandSubtitle}>{subtitle}</Text>
-      </View>
+      </Pressable>
       {right}
     </View>
   );
@@ -85,6 +89,7 @@ export function Button({
         variant === 'secondary' && styles.secondaryButton,
         variant === 'quiet' && styles.quietButton,
         variant === 'danger' && styles.dangerButton,
+        variant === 'alert' && styles.alertButton,
         isDisabled && styles.disabled,
         pressed && styles.pressed,
         style,
@@ -98,6 +103,7 @@ export function Button({
             styles.buttonText,
             variant === 'primary' && styles.primaryButtonText,
             variant === 'danger' && styles.dangerButtonText,
+            variant === 'alert' && styles.alertButtonText,
           ]}
         >
           {children}
@@ -186,7 +192,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   shell: { flex: 1, width: '100%', maxWidth: 438, alignSelf: 'center' },
   content: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },
-  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 33, backgroundColor: colors.bg },
+  footer: { paddingHorizontal: 16, paddingTop: 19, paddingBottom: 33, backgroundColor: colors.bg },
   brandBar: {
     minHeight: 65,
     flexDirection: 'row',
@@ -231,6 +237,7 @@ const styles = StyleSheet.create({
   },
   quietButton: { backgroundColor: 'transparent' },
   dangerButton: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.red },
+  alertButton: { backgroundColor: colors.red },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.8 },
   buttonText: {
@@ -244,6 +251,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: colors.onPrimary },
   dangerButtonText: { color: colors.red },
+  alertButtonText: { color: colors.onPrimary },
   field: { gap: 10, marginBottom: 20 },
   fieldLabel: { ...common.label },
   input: {
@@ -282,7 +290,8 @@ const styles = StyleSheet.create({
   notice: {
     gap: 18,
     marginVertical: 10,
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 28,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: colors.border,

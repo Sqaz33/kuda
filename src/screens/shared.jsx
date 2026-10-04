@@ -86,11 +86,12 @@ export function AvatarStack({ members = [], compact = false }) {
   );
 }
 
-export function Header({ room, center, onAccount, onExit }) {
+export function Header({ room, center, onAccount, onExit, onHome }) {
   return (
     <>
       <Topline room={room} center={center} onAccount={onAccount} />
       <Brand
+        onPress={onHome}
         right={
           room ? (
             <View style={styles.headerActions}>
@@ -108,13 +109,13 @@ export function Header({ room, center, onAccount, onExit }) {
   );
 }
 
-export function PageIntro({ label, title, description, style }) {
+export function PageIntro({ label, title, description, style, titleStyle, descriptionStyle }) {
   return (
     <View style={style}>
       <Eyebrow>{label}</Eyebrow>
-      <Text style={[common.title, styles.pageTitle]}>{title}</Text>
+      <Text style={[common.title, styles.pageTitle, titleStyle]}>{title}</Text>
       {description ? (
-        <Body muted style={styles.pageDescription}>
+        <Body muted style={[styles.pageDescription, descriptionStyle]}>
           {description}
         </Body>
       ) : null}
@@ -131,13 +132,18 @@ export function BackLink({ onPress, children = 'НА ГЛАВНУЮ', style }) {
 }
 
 export function VenueImage({ venue, height = 281, badge }) {
+  const numericId = Number(venue?.id?.match(/^venue-(\d+)$/)?.[1]);
+  const photoKey =
+    venue?.photoKey || (numericId ? ['neon', 'salt', 'hero'][(numericId - 1) % 3] : null);
   const source = venue?.photoUrl
     ? { uri: venue.photoUrl }
-    : venue?.photoKey === 'neon' || venue?.id === 'venue-1'
+    : photoKey === 'neon'
       ? require('../../assets/venue-neon.png')
-      : venue?.photoKey === 'salt' || venue?.id === 'venue-2'
+      : photoKey === 'salt'
         ? require('../../assets/venue-salt.png')
-        : null;
+        : photoKey === 'hero'
+          ? require('../../assets/hero.png')
+          : null;
   return source ? (
     <ImageBackground
       source={source}

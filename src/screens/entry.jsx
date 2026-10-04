@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ImageBackground,
   Linking,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -125,9 +126,11 @@ export function AuthScreen({ onBack, onEmail, onMini, mini, busy, user }) {
         label="01 / АККАУНТ"
         title={mode === 'login' ? 'С возвращением.' : 'Будем знакомы.'}
         description={
-          user && !user.email
-            ? 'Привяжите почту — комнаты и голоса сохранятся.'
-            : 'Вход по почте позволит вернуться к своим комнатам на другом устройстве.'
+          mode === 'login'
+            ? 'Войдите по почте, чтобы вернуться к своим комнатам.'
+            : user && !user.email
+              ? 'Привяжите почту — комнаты и голоса сохранятся.'
+              : 'Вход по почте позволит вернуться к своим комнатам на другом устройстве.'
         }
       />
       <View style={styles.authFields}>
@@ -197,7 +200,11 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
       <PageIntro
         label="01 / ПРОФИЛЬ"
         title="Ваш профиль."
-        description="Комнаты и голоса доступны на устройствах, где вы вошли в аккаунт."
+        description={
+          user.method === 'guest'
+            ? 'Гостевой профиль сохранён на этом устройстве. Привяжите почту, чтобы открывать комнаты на других устройствах.'
+            : 'Комнаты и голоса доступны на устройствах, где вы вошли в аккаунт.'
+        }
       />
       <Card style={styles.accountCard}>
         <Eyebrow>ИМЯ</Eyebrow>
@@ -234,6 +241,8 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
       <PageIntro
         label="01 / ПРИСОЕДИНИТЬСЯ"
         title="Введите код комнаты."
+        titleStyle={{ maxWidth: 270 }}
+        descriptionStyle={{ marginTop: 42 }}
         description="Попросите четырёхзначный код у создателя комнаты."
       />
       <View style={styles.codeSection}>
@@ -275,6 +284,7 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
 
 export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode }) {
   const [name, setName] = useState(user?.name || '');
+  const [askName, setAskName] = useState(false);
   const room = preview.room;
   const blocked = ['cancelled', 'expired', 'full', 'invalid', 'removed'].includes(preview.access);
   const selected = preview.access === 'selected';
@@ -300,9 +310,9 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
         ) : (
           <>
             <Button
-              disabled={!user && name.trim().length < 2}
+              variant="quiet"
               loading={busy}
-              onPress={() => onJoin(name.trim())}
+              onPress={() => (user ? onJoin(user.name) : setAskName(true))}
             >
               Присоединиться
             </Button>
@@ -311,14 +321,11 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
         )
       }
     >
-      <Header room={room} />
-      <BackLink
-        onPress={onBack}
-        children={fromCode ? 'ВВЕСТИ ДРУГОЙ КОД' : 'НА ГЛАВНУЮ'}
-        style={styles.previewBack}
-      />
+      <Header room={room} onHome={onBack} />
       <PageIntro
         label={`ПРИГЛАШЕНИЕ В КОМНАТУ #${room.code}`}
+        titleStyle={{ maxWidth: 255 }}
+        descriptionStyle={{ marginTop: 8 }}
         title={
           selected ? 'Место уже выбрано.' : blocked ? 'Войти не получится.' : 'Вас зовут выбирать.'
         }
@@ -330,19 +337,7 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
               : `${room.hostName} и компания выбирают место. Встреча — ${meeting(room.constraints)}.`
         }
       />
-      {!user && !blocked && !selected ? (
-        <View style={styles.guestName}>
-          <Field
-            label="Как вас зовут"
-            value={name}
-            onChangeText={setName}
-            placeholder="Имя для компании"
-          />
-        </View>
-      ) : null}
-      <View
-        style={[styles.inviteCard, !user && !blocked && !selected && styles.inviteCardAfterName]}
-      >
+      <View style={styles.inviteCard}>
         <ImageBackground
           source={require('../../assets/hero.png')}
           style={styles.invitePhoto}
@@ -371,6 +366,36 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
           {preview.reason}
         </Notice>
       ) : null}
+      <Modal
+        transparent
+        visible={askName}
+        animationType="fade"
+        onRequestClose={() => setAskName(false)}
+      >
+        <View style={styles.guestModalShade}>
+          <View style={styles.guestModal}>
+            <Text style={common.heading}>Как вас зовут?</Text>
+            <Body muted>Это имя увидят другие участники комнаты.</Body>
+            <Field
+              label="ВАШЕ ИМЯ"
+              value={name}
+              onChangeText={setName}
+              placeholder="Имя для компании"
+              autoFocus
+            />
+            <Button
+              disabled={name.trim().length < 2}
+              loading={busy}
+              onPress={() => onJoin(name.trim())}
+            >
+              Войти в комнату
+            </Button>
+            <Button variant="quiet" onPress={() => setAskName(false)}>
+              Отмена
+            </Button>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -413,7 +438,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 0.6,
     textAlign: 'center',
-    marginTop: 18,
+    marginTop: 13,
   },
   rooms: { marginTop: 26, marginBottom: 12 },
   roomRow: {
@@ -440,7 +465,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     justifyContent: 'center',
   },
-  codeInputFocused: { borderColor: colors.text },
+  codeInputFocused: { borderColor: colors.borderStrong },
   codeCapture: {
     position: 'absolute',
     top: 0,
@@ -453,30 +478,45 @@ const styles = StyleSheet.create({
   codeDigits: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    gap: 20,
     paddingHorizontal: 16,
   },
   codeDigit: {
     width: 56,
     color: colors.text,
     fontFamily: fonts.monoBold,
-    fontSize: 38,
+    fontSize: 46,
     textAlign: 'center',
   },
   codeDigitEmpty: { color: colors.muted },
-  whatNext: { marginTop: 68 },
-  previewBack: { marginTop: -18, marginBottom: 10 },
+  whatNext: { marginTop: 54 },
   inviteCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 5,
     overflow: 'hidden',
-    marginTop: 60,
+    marginTop: 55,
   },
   invitePhoto: { height: 248 },
   invitePhotoImage: { resizeMode: 'cover' },
-  inviteDetails: { padding: 18 },
-  guestName: { marginTop: 28 },
-  inviteCardAfterName: { marginTop: 8 },
+  inviteDetails: { paddingTop: 18, paddingHorizontal: 18, paddingBottom: 5 },
+  guestModalShade: {
+    flex: 1,
+    backgroundColor: '#000A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  guestModal: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 20,
+    gap: 15,
+  },
 });

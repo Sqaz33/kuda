@@ -46,7 +46,6 @@ export async function shareInvite(token) {
         /* Local HTTP may not grant clipboard access. */
       }
     }
-    window.prompt('Скопируйте ссылку приглашения', link);
     return 'shown';
   }
   await Share.share({ message: `Присоединяйся к выбору места: ${link}` });

@@ -101,7 +101,10 @@ test('demo guests are added only when a room is created and finish random voting
       host.token,
     );
   }
-  const decided = (await call('GET', `/v1/rooms/${created.id}`, null, host.token)).data;
+  const ready = (await call('GET', `/v1/rooms/${created.id}`, null, host.token)).data;
+  assert.equal(ready.status, 'swiping');
+  assert.ok(ready.members.every((member) => member.finished));
+  const decided = (await call('POST', `/v1/rooms/${created.id}/close-voting`, {}, host.token)).data;
   assert.equal(decided.status, 'deciding');
   assert.ok(decided.matches.length > 0);
   assert.equal(decided.matches[0].total, 3);
@@ -113,6 +116,43 @@ test('demo guests are added only when a room is created and finish random voting
     .data;
   assert.equal(joined.members.length, 4);
   assert.equal(joined.members.filter((member) => member.isDemo).length, 2);
+  assert.equal(joined.inviteToken, another.inviteToken);
+});
+
+test('host can exclude a member and a guest can leave a room', async (t) => {
+  const server = createMockServer({ demoParticipants: 0 });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  async function call(method, path, token, body) {
+    const response = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, data: await response.json() };
+  }
+  const host = (await call('POST', '/v1/auth/guest', null, { name: 'Анна' })).data;
+  const guest = (await call('POST', '/v1/auth/guest', null, { name: 'Маша' })).data;
+  const room = (await call('POST', '/v1/rooms', host.token, { constraints })).data;
+  await call('POST', `/v1/invites/${room.inviteToken}/join`, guest.token, {});
+  const removed = await call('DELETE', `/v1/rooms/${room.id}/members/${guest.user.id}`, host.token);
+  assert.equal(removed.status, 200);
+  assert.equal(removed.data.members.length, 1);
+  const preview = await call('GET', `/v1/invites/${room.inviteToken}`, guest.token);
+  assert.equal(preview.data.access, 'removed');
+  assert.equal(
+    (await call('POST', `/v1/invites/${room.inviteToken}/join`, guest.token, {})).status,
+    403,
+  );
+
+  const other = (await call('POST', '/v1/auth/guest', null, { name: 'Лиза' })).data;
+  await call('POST', `/v1/invites/${room.inviteToken}/join`, other.token, {});
+  assert.equal((await call('POST', `/v1/rooms/${room.id}/leave`, other.token, {})).status, 200);
+  assert.equal((await call('GET', `/v1/rooms/${room.id}`, host.token)).data.members.length, 1);
 });
 
 test('two clients share a fixed deck, idempotent votes and a final result', async (t) => {
@@ -155,7 +195,9 @@ test('two clients share a fixed deck, idempotent votes and a final result', asyn
     await call('PUT', `/v1/rooms/${created.id}/votes`, { venueId: venue.id, value }, host.token);
     await call('PUT', `/v1/rooms/${created.id}/votes`, { venueId: venue.id, value }, guest.token);
   }
-  const decided = (await call('GET', `/v1/rooms/${created.id}`, null, host.token)).data;
+  const ready = (await call('GET', `/v1/rooms/${created.id}`, null, host.token)).data;
+  assert.equal(ready.status, 'swiping');
+  const decided = (await call('POST', `/v1/rooms/${created.id}/close-voting`, {}, host.token)).data;
   assert.equal(decided.status, 'deciding');
   assert.equal(decided.matchMode, 'unanimous');
   assert.deepEqual(

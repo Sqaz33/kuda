@@ -22,8 +22,7 @@ import {
 function VenueMeta({ venue }) {
   return (
     <Text style={styles.venueMeta}>
-      {categoryLabel(venue.category).toUpperCase()} · {venue.district.toUpperCase()} ·{' '}
-      {venue.priceHint || 'ЧЕК УТОЧНЯЕТСЯ'}
+      {venue.category === 'bar' ? 'КОКТЕЙЛЬНЫЙ БАР' : categoryLabel(venue.category).toUpperCase()}
     </Text>
   );
 }
@@ -139,6 +138,7 @@ export function LobbyScreen({
   const host = isHost(room, user);
   const [member, setMember] = useState(null);
   const [confirmExit, setConfirmExit] = useState(false);
+  const [sharing, setSharing] = useState(false);
   return (
     <>
       <Screen
@@ -146,7 +146,13 @@ export function LobbyScreen({
           <>
             <TwoButtons
               left={
-                <Button variant="secondary" onPress={onShare} style={styles.flexButton}>
+                <Button
+                  variant="secondary"
+                  onPress={async () => {
+                    if ((await onShare()) === 'shown') setSharing(true);
+                  }}
+                  style={styles.flexButton}
+                >
                   Поделиться ссылкой
                 </Button>
               }
@@ -212,35 +218,64 @@ export function LobbyScreen({
             {member.id === room.hostId ? 'СОЗДАТЕЛЬ КОМНАТЫ' : 'УЧАСТНИК'}
           </Eyebrow>
           {host && member.id !== room.hostId ? (
-            <Button variant="danger" onPress={() => { onRemove(member.id); setMember(null); }}>
+            <Button
+              variant="danger"
+              style={styles.removeMemberButton}
+              onPress={() => {
+                onRemove(member.id);
+                setMember(null);
+              }}
+            >
               Исключить из комнаты
             </Button>
           ) : null}
-          <Button onPress={() => setMember(null)}>
-            Закрыть
-          </Button>
+          <Button onPress={() => setMember(null)}>Закрыть</Button>
+        </Overlay>
+      ) : null}
+      {sharing ? (
+        <Overlay title="Пригласить друзей" onClose={() => setSharing(false)}>
+          <Body muted>Отправьте эту ссылку участникам встречи:</Body>
+          <Text selectable style={styles.shareLink}>
+            {inviteLink(room.inviteToken)}
+          </Text>
+          <Button onPress={() => setSharing(false)}>Готово</Button>
         </Overlay>
       ) : null}
       {confirmExit ? (
-        <Overlay title="Выйти из комнаты?" onClose={() => setConfirmExit(false)}>
+        <Overlay
+          title="Выйти из комнаты?"
+          onClose={() => setConfirmExit(false)}
+          style={styles.exitOverlay}
+        >
           <Body muted style={styles.modalBody}>
             {host
               ? 'Если вы выйдете, комната закроется для всех участников.'
               : 'Вы сможете снова войти по ссылке приглашения.'}
           </Body>
-          <Button
-            variant="danger"
-            onPress={() => {
-              setConfirmExit(false);
-              if (host) onCancel();
-              else onLeave();
-            }}
-          >
-            Выйти из комнаты
-          </Button>
-          <Button variant="quiet" onPress={() => setConfirmExit(false)}>
-            Остаться
-          </Button>
+          <TwoButtons
+            left={
+              <Button
+                variant="secondary"
+                style={styles.flexButton}
+                onPress={() => setConfirmExit(false)}
+              >
+                Отмена
+              </Button>
+            }
+            right={
+              <Button
+                variant="alert"
+                style={styles.flexButton}
+                onPress={() => {
+                  setConfirmExit(false);
+                  if (host) onCancel();
+                  else onLeave();
+                }}
+              >
+                {host ? 'Закрыть комнату' : 'Выйти'}
+              </Button>
+            }
+          />
         </Overlay>
       ) : null}
     </>
@@ -402,6 +437,7 @@ export function WaitingScreen({ room, user, onBack, onFinish, onCancel, onRefres
       <PageIntro
         label="06 / ВЫБОР ЗАВЕРШЁН"
         title={allFinished ? 'Все закончили.' : 'Ждём остальных.'}
+        descriptionStyle={{ marginTop: 45 }}
         description={
           allFinished
             ? 'Все участники сделали выбор. Результат готов.'
@@ -432,7 +468,7 @@ export function WaitingScreen({ room, user, onBack, onFinish, onCancel, onRefres
 }
 
 export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend, onCancel }) {
-  const matches = room.matches || [];
+  const matches = (room.matches || []).slice(0, room.matchMode === 'unanimous' ? 5 : 3);
   const host = isHost(room, user);
   const unanimous = room.matchMode === 'unanimous';
   const [selected, setSelected] = useState(unanimous ? matches[0]?.venue.id : null);
@@ -448,15 +484,22 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
                 : 'Сначала выберите место'}
           </Button>
         ) : (
-          <Button variant="secondary" onPress={onBack}>
-            Проверить результат
+          <Button variant="secondary" disabled>
+            Ждём решения создателя
           </Button>
         )
       }
     >
       <Header room={room} />
       <PageIntro
-        label={unanimous ? '03 / РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ' : 'ПОСЛЕ ДЕДЛАЙНА'}
+        label={
+          unanimous
+            ? '03 / РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ'
+            : selected && host
+              ? 'ПОСЛЕ ДЕДЛАЙНА / ВЫБОР МЕСТА'
+              : 'ПОСЛЕ ДЕДЛАЙНА'
+        }
+        descriptionStyle={{ marginTop: 45 }}
         title={
           unanimous
             ? 'Есть совпадение.'
@@ -466,16 +509,20 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
         }
         description={
           unanimous
-            ? 'Одно место понравилось всем. Вы создатель — подтвердите его для компании.'
+            ? host
+              ? 'Одно место понравилось всем. Вы создатель — подтвердите его для компании.'
+              : 'Одно место понравилось всем. Создатель подтвердит его для компании.'
             : matches.length
               ? host
-                ? 'Выберите одно из трёх мест, затем подтвердите решение.'
-                : 'Создатель выберет одно из трёх мест для компании.'
+                ? selected
+                  ? 'Место выделено. Подтвердите выбор для всей компании.'
+                  : 'Выберите одно из трёх мест, затем подтвердите решение.'
+                : 'Три места получили поддержку. Создатель выберет одно для всей компании.'
               : 'Ни одно место не набрало достаточно голосов.'
         }
       />
       {!unanimous && matches.length ? (
-        <View style={styles.resultNotice}>
+        <View style={styles.majorityNotice}>
           <Notice
             title={
               host
@@ -485,12 +532,15 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
                 : 'РЕШЕНИЕ ЗА СОЗДАТЕЛЕМ'
             }
           >
-            {room.incomplete ? 'Не все участники успели ответить. ' : ''}Три места получили
-            поддержку компании.
+            {selected && host
+              ? 'После подтверждения все увидят итог.'
+              : !host
+                ? 'Создатель сравнивает три варианта.'
+                : `${room.incomplete ? 'Не все участники успели ответить. ' : ''}Три места получили поддержку компании.`}
           </Notice>
         </View>
       ) : null}
-      <View style={styles.matchesList}>
+      <View style={[styles.matchesList, !unanimous && styles.majorityList]}>
         {matches.map((match, index) => (
           <Pressable
             key={match.venue.id}
@@ -508,7 +558,9 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
                 <VenueImage venue={match.venue} height={144} />
               </View>
             ) : (
-              <Text style={styles.majorityNumber}>{String(index + 1).padStart(2, '0')}</Text>
+              <Text style={styles.majorityNumber}>
+                {selected === match.venue.id && host ? '✓' : String(index + 1).padStart(2, '0')}
+              </Text>
             )}
             <View style={styles.matchDetails}>
               {unanimous ? <VenueMeta venue={match.venue} /> : null}
@@ -564,6 +616,7 @@ export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, p
           label="04 / ВЕЧЕР РЕШЁН"
           title={venue.name}
           description={`${meeting(room.constraints)} · ${room.members.length} участников`}
+          descriptionStyle={{ marginTop: 15 }}
         />
         <View style={styles.resultVenue}>
           <Pressable onPress={() => setShowReviews(true)} accessibilityRole="button">
@@ -588,7 +641,9 @@ export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, p
             <Eyebrow style={{ marginTop: 15 }}>ПОЗВОНИТЕ В ЗАВЕДЕНИЕ ПЕРЕД ПОЕЗДКОЙ</Eyebrow>
           </Card>
         </View>
-        <MapPreview onPress={() => onAction('map', mapUrl)} />
+        <View style={{ marginTop: 6 }}>
+          <MapPreview onPress={() => onAction('map', mapUrl)} />
+        </View>
         {isHost(room, user) ? (
           <View style={styles.booking}>
             <Eyebrow>ЧТО С БРОНЬЮ?</Eyebrow>
@@ -760,7 +815,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 14,
   },
-  codeCard: { marginTop: 42, paddingVertical: 23, minHeight: 169 },
+  codeCard: { marginTop: 45, paddingVertical: 19.5, minHeight: 169 },
   code: {
     color: colors.text,
     fontFamily: fonts.monoBold,
@@ -770,7 +825,7 @@ const styles = StyleSheet.create({
   },
   codeCaption: { ...common.small, marginTop: 1 },
   participantSection: { marginTop: 38 },
-  roomAvatars: { flexDirection: 'row', gap: 13, marginTop: 28 },
+  roomAvatars: { flexDirection: 'row', gap: 13, marginTop: 24 },
   roomAvatar: {
     width: 45,
     height: 45,
@@ -785,7 +840,7 @@ const styles = StyleSheet.create({
   roomBottomActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 23,
     marginBottom: 4,
   },
   overlayShade: {
@@ -805,7 +860,14 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 15,
   },
-  overlayHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, paddingBottom: 15 },
+  overlayHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
+    paddingBottom: 15,
+  },
   overlayTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 22 },
   overlayClose: { color: colors.secondary, fontSize: 27 },
   modalAvatar: {
@@ -816,13 +878,16 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   modalInitial: { color: colors.text, fontFamily: fonts.bold, fontSize: 19 },
   modalName: { color: colors.text, fontFamily: fonts.bold, fontSize: 22, textAlign: 'center' },
-  modalRole: { textAlign: 'center', marginBottom: 14 },
+  modalRole: { textAlign: 'center', marginBottom: 4 },
+  removeMemberButton: { backgroundColor: colors.surfaceRaised, borderColor: colors.surfaceRaised },
+  exitOverlay: { minHeight: 270, justifyContent: 'space-between' },
   modalBody: { marginVertical: 10 },
   modalRating: { color: colors.text, fontFamily: fonts.bold, fontSize: 28 },
+  shareLink: { color: colors.text, fontFamily: fonts.mono, fontSize: 12, lineHeight: 18 },
   reviewsOverlay: { minHeight: 440, justifyContent: 'space-between' },
   reviewPlaceholder: { minHeight: 144 },
   sectionHead: {
@@ -916,19 +981,21 @@ const styles = StyleSheet.create({
   extraAction: { marginTop: 22 },
   waitingCard: { marginTop: 45, paddingVertical: 27 },
   finishedCard: {
-    marginTop: 25,
+    marginTop: 21,
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 30,
-    paddingVertical: 18,
+    paddingVertical: 21,
   },
   finishedNumber: { color: colors.red, fontFamily: fonts.monoBold, fontSize: 13, marginTop: 4 },
   finishedTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 18 },
   finishedNames: { marginTop: 12 },
-  resultNotice: { marginTop: 40 },
+  resultNotice: { marginTop: 37 },
   bigCount: { color: colors.text, fontFamily: fonts.number, fontSize: 72, marginTop: 14 },
   countSuffix: { color: colors.muted, fontSize: 29 },
-  matchesList: { marginTop: 52, gap: 16 },
+  matchesList: { marginTop: 58, gap: 16 },
+  majorityList: { marginTop: 22 },
+  majorityNotice: { marginTop: 56 },
   matchCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -939,7 +1006,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     gap: 16,
   },
-  matchSelected: { borderColor: colors.red },
+  matchSelected: { borderColor: colors.red, backgroundColor: '#24191B' },
   majorityRow: { height: 91, paddingHorizontal: 17, gap: 30 },
   majorityNumber: { color: colors.red, fontFamily: fonts.monoBold, fontSize: 13 },
   matchPhoto: { width: 144, height: 144 },
@@ -955,8 +1022,13 @@ const styles = StyleSheet.create({
   matchName: { color: colors.text, fontFamily: fonts.bold, fontSize: 21, marginTop: 9 },
   matchVotes: { color: colors.green, fontFamily: fonts.mono, fontSize: 10, marginTop: 11 },
   matchArrow: { color: colors.red, fontSize: 20, marginRight: 12 },
-  resultVenue: { marginTop: 35 },
-  resultInfo: { borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingVertical: 22 },
+  resultVenue: { marginTop: 38 },
+  resultInfo: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingVertical: 22,
+    minHeight: 212,
+  },
   address: { color: colors.text, fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.8 },
   bookingStatus: { fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.8 },
   booking: { marginTop: 30 },

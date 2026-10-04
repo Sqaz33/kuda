@@ -120,7 +120,11 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
   const footer = editing ? (
     <Button onPress={closeEditor}>Сохранить</Button>
   ) : (
-    <Button disabled={!ready} loading={busy} onPress={() => onCreate(constraints, name.trim() || 'Гость')}>
+    <Button
+      disabled={!ready}
+      loading={busy}
+      onPress={() => onCreate(constraints, name.trim() || 'Гость')}
+    >
       Создать встречу
     </Button>
   );

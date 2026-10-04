@@ -5,7 +5,7 @@ const categories = ['cafe', 'restaurant', 'bar'];
 const names = [
   'Neon Velvet',
   'Соль и хлеб',
-  'Тихий угол',
+  'Бюро',
   'Встреча',
   'Пятый стол',
   'Светлый зал',
@@ -51,7 +51,7 @@ export const venues = names.map((name, index) => ({
   id: `venue-${index + 1}`,
   name,
   category: index === 0 ? 'bar' : categories[index % 3],
-  photoKey: index === 0 ? 'neon' : index === 1 ? 'salt' : null,
+  photoKey: index % 3 === 0 ? 'neon' : index % 3 === 1 ? 'salt' : 'hero',
   cuisine: ['Европейская кухня', 'Авторская кухня', 'Кофе и десерты', 'Смешанная кухня'][index % 4],
   district: index < 20 ? 'Центральный' : 'Ворошиловский',
   address: `Волгоград, улица Мира, ${index + 3}`,
@@ -175,9 +175,9 @@ export function calculateMatches(room) {
     finished.length >= quorum
       ? scored.filter((match) => match.likes >= Math.ceil(finished.length * 0.6) && match.likes > 0)
       : [];
-  if (majority.length) return { matches: majority.slice(0, 5), matchMode: 'majority', incomplete };
+  if (majority.length) return { matches: majority.slice(0, 3), matchMode: 'majority', incomplete };
   return {
-    matches: scored.filter((match) => match.likes > 0).slice(0, 5),
+    matches: scored.filter((match) => match.likes > 0).slice(0, 3),
     matchMode: 'host_choice',
     incomplete,
   };
@@ -255,7 +255,7 @@ export function createMemoryStore() {
     return {
       id: room.id,
       code: room.code,
-      inviteToken: room.hostId === user?.id ? room.inviteToken : null,
+      inviteToken: room.inviteToken,
       hostId: room.hostId,
       hostName: room.hostName,
       status: room.status,

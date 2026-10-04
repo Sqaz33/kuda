@@ -73,10 +73,7 @@ function hostRoom(id, user) {
 }
 function maybeFinalize(room) {
   if (room.status !== 'swiping') return;
-  if (
-    room.members.every((member) => member.finished) ||
-    (room.deadlineAt && Date.now() >= Date.parse(room.deadlineAt))
-  ) {
+  if (room.deadlineAt && Date.now() >= Date.parse(room.deadlineAt)) {
     Object.assign(room, calculateMatches(room));
     room.status = 'deciding';
   }
@@ -328,17 +325,21 @@ export async function handle(request, response, { demoParticipants = 2 } = {}) {
         return send(response, 200, store.serialize(memberRoom(id, user), user));
       if (request.method === 'POST' && action === 'leave') {
         const room = memberRoom(id, user);
-        if (room.hostId === user.id) fail(409, 'HOST_CANNOT_LEAVE', 'Создатель может закрыть комнату.');
+        if (room.hostId === user.id)
+          fail(409, 'HOST_CANNOT_LEAVE', 'Создатель может закрыть комнату.');
         room.members = room.members.filter((member) => member.id !== user.id);
         delete room.votes[user.id];
         return send(response, 200, { ok: true });
       }
       if (request.method === 'DELETE' && action.startsWith('members/')) {
         const room = hostRoom(id, user);
-        if (!['waiting', 'swiping'].includes(room.status)) fail(409, 'ROOM_CLOSED', 'Состав комнаты уже нельзя изменить.');
+        if (!['waiting', 'swiping'].includes(room.status))
+          fail(409, 'ROOM_CLOSED', 'Состав комнаты уже нельзя изменить.');
         const memberId = decodeURIComponent(action.slice('members/'.length));
-        if (memberId === user.id) fail(409, 'HOST_CANNOT_REMOVE_SELF', 'Создатель не может исключить себя.');
-        if (!room.members.some((member) => member.id === memberId)) fail(404, 'MEMBER_NOT_FOUND', 'Участник не найден.');
+        if (memberId === user.id)
+          fail(409, 'HOST_CANNOT_REMOVE_SELF', 'Создатель не может исключить себя.');
+        if (!room.members.some((member) => member.id === memberId))
+          fail(404, 'MEMBER_NOT_FOUND', 'Участник не найден.');
         room.members = room.members.filter((member) => member.id !== memberId);
         room.removedIds.push(memberId);
         delete room.votes[memberId];

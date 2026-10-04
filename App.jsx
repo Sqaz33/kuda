@@ -331,10 +331,11 @@ export default function App() {
     });
   }
   async function share() {
-    await run(async () => {
+    return run(async () => {
       const result = await shareInvite(room.inviteToken);
       if (result === 'copied') setError('Ссылка скопирована.');
       void api.track('invite_shared', { roomId: room.id }).catch(() => {});
+      return result;
     });
   }
   function openAction(kind, url) {
@@ -363,7 +364,7 @@ export default function App() {
         rooms={rooms}
         onCreate={() => setScreen('create')}
         onJoin={() => setScreen('join')}
-        onAuth={() => setScreen(user && user.method !== 'guest' ? 'account' : 'auth')}
+        onAuth={() => setScreen(user ? 'account' : 'auth')}
         onOpen={openRoom}
       />
     );
