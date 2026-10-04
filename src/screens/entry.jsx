@@ -401,7 +401,16 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
 }
 
 const styles = StyleSheet.create({
-  hero: { height: 307, width: '100%', padding: 12, marginTop: -12 },
+  hero: {
+    height: 307,
+    width: '100%',
+    padding: 12,
+    marginTop: -12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
   heroImage: { borderRadius: 5 },
   heroBadge: {
     alignSelf: 'flex-start',

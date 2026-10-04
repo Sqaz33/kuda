@@ -499,9 +499,11 @@ export default function App() {
       <StatusBar style="light" />
       {content}
       {screen !== 'loading' && error && screen !== 'unavailable' ? (
-        <Pressable onPress={() => setError('')} style={styles.toast}>
-          <Text style={styles.toastText}>{error} ×</Text>
-        </Pressable>
+        <View pointerEvents="box-none" style={styles.toastContainer}>
+          <Pressable onPress={() => setError('')} style={styles.toast}>
+            <Text style={styles.toastText}>{error} ×</Text>
+          </Pressable>
+        </View>
       ) : null}
       {offline ? (
         <View style={styles.offline}>
@@ -514,11 +516,17 @@ export default function App() {
 
 const styles = StyleSheet.create({
   loading: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  toast: {
+  toastContainer: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 0,
+    right: 0,
     bottom: 22,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  toast: {
+    width: '100%',
+    maxWidth: 406,
     backgroundColor: colors.surface,
     borderColor: colors.red,
     borderWidth: 1,
