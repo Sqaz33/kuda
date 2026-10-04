@@ -415,7 +415,6 @@ export default function App() {
         onCancel={cancelRoom}
         onLeave={leaveRoom}
         onRemove={removeMember}
-        onRefresh={() => openRoom(room.id)}
         busy={busy}
       />
     );
@@ -441,7 +440,6 @@ export default function App() {
         onBack={goHome}
         onFinish={closeVoting}
         onCancel={cancelRoom}
-        onRefresh={() => openRoom(room.id)}
       />
     );
   else if (screen === 'matches' && room)

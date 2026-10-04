@@ -132,42 +132,43 @@ export function LobbyScreen({
   onCancel,
   onLeave,
   onRemove,
-  onRefresh,
   busy,
 }) {
   const host = isHost(room, user);
   const [member, setMember] = useState(null);
   const [confirmExit, setConfirmExit] = useState(false);
   const [sharing, setSharing] = useState(false);
+  async function shareLink() {
+    if ((await onShare()) === 'shown') setSharing(true);
+  }
   return (
     <>
       <Screen
         footer={
           <>
-            <TwoButtons
-              left={
-                <Button
-                  variant="secondary"
-                  onPress={async () => {
-                    if ((await onShare()) === 'shown') setSharing(true);
-                  }}
-                  style={styles.flexButton}
-                >
-                  Поделиться ссылкой
-                </Button>
-              }
-              right={
-                <Button
-                  variant={host ? 'primary' : 'secondary'}
-                  onPress={host ? onStart : onRefresh}
-                  loading={busy}
-                  disabled={host && room.members.length < 2}
-                  style={styles.flexButton}
-                >
-                  {host ? 'Начать выбор' : 'Проверить старт'}
-                </Button>
-              }
-            />
+            {host ? (
+              <TwoButtons
+                left={
+                  <Button variant="secondary" onPress={shareLink} style={styles.flexButton}>
+                    Поделиться ссылкой
+                  </Button>
+                }
+                right={
+                  <Button
+                    onPress={onStart}
+                    loading={busy}
+                    disabled={room.members.length < 2}
+                    style={styles.flexButton}
+                  >
+                    Начать выбор
+                  </Button>
+                }
+              />
+            ) : (
+              <Button variant="secondary" onPress={shareLink}>
+                Поделиться ссылкой
+              </Button>
+            )}
             <Text style={styles.footerHint}>КУДА.　 /　 ОДНА КОМНАТА — ОДНО РЕШЕНИЕ</Text>
           </>
         }
@@ -420,19 +421,13 @@ export function DeckScreen({
   );
 }
 
-export function WaitingScreen({ room, user, onBack, onFinish, onCancel, onRefresh }) {
+export function WaitingScreen({ room, user, onBack, onFinish, onCancel }) {
   const finished = room.members.filter((member) => member.finished).length;
   const allFinished = finished === room.members.length;
   const canFinish =
     isHost(room, user) && (allFinished || Date.now() >= Date.parse(room.deadlineAt));
   return (
-    <Screen
-      footer={
-        <Button onPress={canFinish ? onFinish : onRefresh} disabled={!canFinish && !onRefresh}>
-          {canFinish ? 'Посмотреть результат' : 'Проверить статус'}
-        </Button>
-      }
-    >
+    <Screen footer={canFinish ? <Button onPress={onFinish}>Посмотреть результат</Button> : null}>
       <Header room={room} />
       <PageIntro
         label="06 / ВЫБОР ЗАВЕРШЁН"
