@@ -50,6 +50,7 @@ export default function App() {
   const [rooms, setRooms] = useState([]);
   const [room, setRoom] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [previewOrigin, setPreviewOrigin] = useState('home');
   const [venue, setVenue] = useState(null);
   const [returnTo, setReturnTo] = useState('deck');
   const [busy, setBusy] = useState(false);
@@ -91,6 +92,7 @@ export default function App() {
     try {
       const next = await api.preview(token);
       setPreview(next);
+      setPreviewOrigin('home');
       setScreen('preview');
       void api.track('invite_opened', { roomId: next.room.id }).catch(() => {});
     } catch (cause) {
@@ -194,6 +196,7 @@ export default function App() {
   async function goHome() {
     setRoom(null);
     setPreview(null);
+    setError('');
     setScreen('home');
     await refreshRooms();
   }
@@ -243,6 +246,7 @@ export default function App() {
     await run(async () => {
       const found = await api.roomByCode(code);
       setPreview(found);
+      setPreviewOrigin('join');
       setScreen('preview');
     });
   }
@@ -373,7 +377,14 @@ export default function App() {
     content = <JoinCodeScreen onBack={goHome} onLookup={lookupCode} busy={busy} />;
   else if (screen === 'preview' && preview)
     content = (
-      <PreviewScreen preview={preview} user={user} onBack={goHome} onJoin={joinRoom} busy={busy} />
+      <PreviewScreen
+        preview={preview}
+        user={user}
+        onBack={previewOrigin === 'join' ? () => setScreen('join') : goHome}
+        onJoin={joinRoom}
+        busy={busy}
+        fromCode={previewOrigin === 'join'}
+      />
     );
   else if (screen === 'lobby' && room)
     content = (

@@ -104,14 +104,20 @@ export function LobbyScreen({ room, user, onBack, onStart, onShare, onRotate, on
     >
       <Header room={room} />
       <PageIntro
-        label="02 / КОМНАТА СОЗДАНА"
-        title="Позовите своих."
-        description="Отправьте ссылку друзьям. Выбор начнётся, когда компания соберётся."
+        label={host ? '02 / КОМНАТА СОЗДАНА' : '02 / ВЫ В КОМНАТЕ'}
+        title={host ? 'Позовите своих.' : 'Ждём создателя.'}
+        description={
+          host
+            ? 'Отправьте ссылку друзьям. Выбор начнётся, когда компания соберётся.'
+            : 'Вы присоединились. Когда создатель начнёт выбор, здесь появятся карточки мест.'
+        }
       />
       <Card style={styles.codeCard}>
         <Eyebrow>КОД КОМНАТЫ</Eyebrow>
         <Text style={styles.code}>{room.code}</Text>
-        <Text style={styles.codeCaption}>Друзья могут ввести этот код на главной</Text>
+        <Text style={styles.codeCaption}>
+          {host ? 'Друзья могут ввести этот код на главной' : 'Сохраните код для повторного входа'}
+        </Text>
       </Card>
       <View style={styles.sectionHead}>
         <Eyebrow>В КОМНАТЕ</Eyebrow>

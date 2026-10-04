@@ -217,6 +217,7 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
 
 export function JoinCodeScreen({ onBack, onLookup, busy }) {
   const [code, setCode] = useState('');
+  const [focused, setFocused] = useState(false);
   return (
     <Screen
       footer={
@@ -237,16 +238,26 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
       />
       <View style={styles.codeSection}>
         <Eyebrow>КОД КОМНАТЫ</Eyebrow>
-        <TextInput
-          value={code}
-          onChangeText={(text) => setCode(text.replace(/\D/g, '').slice(0, 4))}
-          keyboardType="number-pad"
-          maxLength={4}
-          placeholder="—  —  —  —"
-          placeholderTextColor={colors.muted}
-          style={styles.codeInput}
-          accessibilityLabel="Код комнаты"
-        />
+        <View style={[styles.codeInput, focused && styles.codeInputFocused]}>
+          <TextInput
+            value={code}
+            onChangeText={(text) => setCode(text.replace(/\D/g, '').slice(0, 4))}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onSubmitEditing={() => code.length === 4 && !busy && onLookup(code)}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            style={styles.codeCapture}
+            accessibilityLabel="Код комнаты"
+          />
+          <View pointerEvents="none" style={styles.codeDigits}>
+            {Array.from({ length: 4 }, (_, index) => (
+              <Text key={index} style={[styles.codeDigit, !code[index] && styles.codeDigitEmpty]}>
+                {code[index] || '—'}
+              </Text>
+            ))}
+          </View>
+        </View>
         <Body muted style={{ marginTop: 24 }}>
           Нажмите на поле и введите четыре цифры.
         </Body>
@@ -262,7 +273,7 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
   );
 }
 
-export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
+export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode }) {
   const [name, setName] = useState(user?.name || '');
   const room = preview.room;
   const blocked = ['cancelled', 'expired', 'full', 'invalid', 'removed'].includes(preview.access);
@@ -273,7 +284,7 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
       footer={
         blocked ? (
           <Button variant="secondary" onPress={onBack}>
-            На главную
+            {fromCode ? 'Ввести другой код' : 'На главную'}
           </Button>
         ) : selected ? (
           <Button
@@ -301,6 +312,11 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
       }
     >
       <Header room={room} />
+      <BackLink
+        onPress={onBack}
+        children={fromCode ? 'ВВЕСТИ ДРУГОЙ КОД' : 'НА ГЛАВНУЮ'}
+        style={styles.previewBack}
+      />
       <PageIntro
         label={`ПРИГЛАШЕНИЕ В КОМНАТУ #${room.code}`}
         title={
@@ -311,10 +327,22 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
             ? 'Компания уже определилась с местом встречи.'
             : blocked
               ? preview.reason
-              : `${room.hostName} и компания выбирают место на сегодня. Присоединяйтесь к голосованию.`
+              : `${room.hostName} и компания выбирают место. Встреча — ${meeting(room.constraints)}.`
         }
       />
-      <View style={styles.inviteCard}>
+      {!user && !blocked && !selected ? (
+        <View style={styles.guestName}>
+          <Field
+            label="Как вас зовут"
+            value={name}
+            onChangeText={setName}
+            placeholder="Имя для компании"
+          />
+        </View>
+      ) : null}
+      <View
+        style={[styles.inviteCard, !user && !blocked && !selected && styles.inviteCardAfterName]}
+      >
         <ImageBackground
           source={require('../../assets/hero.png')}
           style={styles.invitePhoto}
@@ -335,15 +363,6 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy }) {
           </Eyebrow>
         </View>
       </View>
-      {!user && !blocked && !selected ? (
-        <Field
-          label="Как вас зовут"
-          value={name}
-          onChangeText={setName}
-          placeholder="Имя для компании"
-          style={styles.guestName}
-        />
-      ) : null}
       {selected ? (
         <Notice title="ВЕЧЕР РЕШЁН">{room.winner?.address || 'Адрес уточняется'}</Notice>
       ) : null}
@@ -419,13 +438,34 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: 5,
+    justifyContent: 'center',
+  },
+  codeInputFocused: { borderColor: colors.text },
+  codeCapture: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0,
+    zIndex: 1,
+  },
+  codeDigits: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 16,
+  },
+  codeDigit: {
+    width: 56,
     color: colors.text,
     fontFamily: fonts.monoBold,
     fontSize: 38,
-    letterSpacing: 16,
     textAlign: 'center',
   },
+  codeDigitEmpty: { color: colors.muted },
   whatNext: { marginTop: 68 },
+  previewBack: { marginTop: -18, marginBottom: 10 },
   inviteCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -438,4 +478,5 @@ const styles = StyleSheet.create({
   invitePhotoImage: { resizeMode: 'cover' },
   inviteDetails: { padding: 18 },
   guestName: { marginTop: 28 },
+  inviteCardAfterName: { marginTop: 8 },
 });

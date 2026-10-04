@@ -109,9 +109,9 @@ export function PageIntro({ label, title, description, style }) {
   );
 }
 
-export function BackLink({ onPress, children = 'НА ГЛАВНУЮ' }) {
+export function BackLink({ onPress, children = 'НА ГЛАВНУЮ', style }) {
   return (
-    <Pressable onPress={onPress} style={styles.back} accessibilityRole="button">
+    <Pressable onPress={onPress} style={[styles.back, style]} accessibilityRole="button">
       <Text style={styles.backText}>← {children}</Text>
     </Pressable>
   );
