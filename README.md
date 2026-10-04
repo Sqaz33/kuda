@@ -1,16 +1,26 @@
-# React + Vite
+# Куда
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + Expo приложение на JavaScript для Web, iOS, Android и мини-приложений Telegram/MAX. Пилотный сценарий — совместный выбор кафе, бара или ресторана в Волгограде. Исходное ТЗ: `ТЗ-Куда-MVP.md` и `docs.zip`, переданные заказчиком; [контракт API](docs/API.md) и [решения по экранам](docs/DESIGN-NOTES.md) находятся в этом репозитории.
 
-Currently, two official plugins are available:
+## Запуск
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```powershell
+cd C:\kuda
+npm install
+npm run mock
+```
 
-## React Compiler
+В другом терминале:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```powershell
+cd C:\kuda
+npm run web
+```
 
-## Expanding the Oxlint configuration
+Для iOS/Android: `npm run ios` / `npm run android` с установленным симулятором или Expo Go. Сборка web: `npm run export:web`. Проверки: `npm test`. Экспорт JS для всех платформ: `npx expo export --platform all`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Мок-сервер использует порт `8787`, сохраняет комнаты только до перезапуска и содержит вымышленные тестовые заведения. Web обращается к `127.0.0.1:8787`, Android Emulator — к `10.0.2.2:8787`, iOS Simulator — к `localhost:8787`. Для телефона в локальной сети и настоящего бэкенда задайте `EXPO_PUBLIC_API_URL`. Для корректных пригласительных ссылок задайте `EXPO_PUBLIC_WEB_URL`. Секреты ботов задаются **только** на сервере: `TELEGRAM_BOT_TOKEN`, `MAX_BOT_TOKEN`.
+
+Основной путь: создать комнату → пригласить человека ссылкой или кодом → начать голосование → оценить общий набор заведений → получить совпадения или объяснённый запасной вариант → организатор выбирает место → звонок/сайт/маршрут и ручная отметка брони. В браузере можно вступить по ссылке без установки и без обязательной регистрации. Почта и пароль привязывают гостевые комнаты к постоянному аккаунту. Telegram и MAX передают `initData` серверу для проверки подписи; обычная веб-страница не выдаёт себя за мини-приложение.
+
+Ограничения перед публичным запуском: нужен настоящий каталог с проверенными правами на фотографии и данные, домен с Universal/App Links, настроенные боты Telegram/MAX, HTTPS API и серверное хранилище. Нативные сборки требуют настроить собственные идентификаторы пакетов и подписи в Expo/EAS.
