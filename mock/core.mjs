@@ -27,6 +27,24 @@ const names = [
   'Рядом',
   'Терраса',
   'Место встречи',
+  'Мастерская вкуса',
+  'Новый берег',
+  'Мята',
+  'Седьмое небо',
+  'Тёплый двор',
+  'Корица',
+  'Камыши',
+  'Огни города',
+  'Полдень',
+  'Три товарища',
+  'Лампа',
+  'Дом у реки',
+  'Маяк',
+  'Рыжий кот',
+  'Восточный двор',
+  'Чердак',
+  'Сад',
+  'Залив',
 ];
 
 export const venues = names.map((name, index) => ({
@@ -228,6 +246,7 @@ export function createMemoryStore() {
       winner: null,
       bookingNote: null,
       reports: [],
+      removedIds: [],
     };
     rooms.set(room.id, room);
     return room;
@@ -261,6 +280,9 @@ export function createMemoryStore() {
     if (!room || room.inviteToken !== token) {
       access = 'invalid';
       reason = 'Ссылка была изменена или не существует.';
+    } else if (room.removedIds?.includes(user?.id)) {
+      access = 'removed';
+      reason = 'Организатор исключил вас из комнаты.';
     } else if (room.status === 'selected' || room.status === 'completed') access = 'selected';
     else if (room.status === 'cancelled' || room.status === 'expired') {
       access = room.status;

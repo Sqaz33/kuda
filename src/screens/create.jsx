@@ -36,13 +36,16 @@ function SettingRow({ label, value, onPress }) {
 export function CreateScreen({ user, onBack, onCreate, busy }) {
   const [editing, setEditing] = useState(null);
   const [name, setName] = useState(user?.name || '');
-  const [date, setDate] = useState(localDate(1));
+  const [date, setDate] = useState(() => {
+    const today = localDate();
+    return Date.parse(`${today}T19:30:00+03:00`) > Date.now() ? today : localDate(1);
+  });
   const [time, setTime] = useState('19:30');
   const [areaMode, setAreaMode] = useState('radius');
   const [district, setDistrict] = useState('Центральный');
   const [pointAddress, setPointAddress] = useState('Центр Волгограда');
   const [radiusKm, setRadiusKm] = useState('3');
-  const [selectedCategories, setCategories] = useState(['bar', 'restaurant', 'cafe']);
+  const [selectedCategories, setCategories] = useState([]);
   const [budgetMax, setBudget] = useState('2000');
   const [partySize, setPartySize] = useState('4');
   const [deadlineMinutes, setDeadline] = useState('15');
@@ -59,7 +62,9 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
       areaMode === 'district'
         ? { type: 'district', district }
         : { type: 'radius', pointAddress: pointAddress.trim(), radiusKm: Number(radiusKm) },
-    categories: selectedCategories,
+    categories: selectedCategories.length
+      ? selectedCategories
+      : categories.map((item) => item.value),
     budgetMax: Number(budgetMax),
     partySize: Number(partySize),
     deadlineMinutes: Number(deadlineMinutes),
@@ -76,18 +81,16 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
     Date.parse(`${date}T${time}:00+03:00`) > Date.now();
   const valid =
     validDate &&
-    selectedCategories.length > 0 &&
     Number(budgetMax) >= 300 &&
     Number(partySize) >= 2 &&
     Number(partySize) <= 12 &&
     Number(deadlineMinutes) >= 5 &&
     Number(deadlineMinutes) <= 120 &&
-    (areaMode === 'district' || (pointAddress.trim().length >= 3 && Number(radiusKm) > 0)) &&
-    (user || name.trim().length >= 2);
+    (areaMode === 'district' || (pointAddress.trim().length >= 3 && Number(radiusKm) > 0));
   const constraintsKey = JSON.stringify(constraints);
 
   useEffect(() => {
-    if (!validDate || !selectedCategories.length) {
+    if (!validDate) {
       setEstimate(null);
       return;
     }
@@ -117,7 +120,7 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
   const footer = editing ? (
     <Button onPress={closeEditor}>Сохранить</Button>
   ) : (
-    <Button disabled={!ready} loading={busy} onPress={() => onCreate(constraints, name.trim())}>
+    <Button disabled={!ready} loading={busy} onPress={() => onCreate(constraints, name.trim() || 'Гость')}>
       Создать встречу
     </Button>
   );
@@ -246,7 +249,11 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
         description="Пара деталей — и мы покажем места, которые подойдут компании."
       />
       <View style={styles.form}>
-        <SettingRow label="КОГДА" value={meeting(constraints)} onPress={() => setEditing('when')} />
+        <SettingRow
+          label="КОГДА"
+          value={meeting(constraints).replace(' · ', ', ')}
+          onPress={() => setEditing('when')}
+        />
         <SettingRow
           label="РАЙОН"
           value={
@@ -259,13 +266,12 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
           <Chips
             options={categories}
             value={selectedCategories}
-            onChange={setCategories}
-            multiple
+            onChange={(value) => setCategories(value[0] === selectedCategories[0] ? [] : value)}
           />
         </View>
         <SettingRow
           label="БЮДЖЕТ НА ЧЕЛОВЕКА"
-          value={money(budgetMax)}
+          value={`До ${Number(budgetMax).toLocaleString('ru-RU')} ₽`}
           onPress={() => setEditing('budget')}
         />
         <SettingRow
@@ -273,15 +279,6 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
           value={`${partySize} человека`}
           onPress={() => setEditing('party')}
         />
-        {!user ? (
-          <Field
-            label="ВАШЕ ИМЯ"
-            value={name}
-            onChangeText={setName}
-            placeholder="Как вас зовут"
-            style={{ marginTop: 2 }}
-          />
-        ) : null}
       </View>
       <Text style={[styles.estimate, estimate?.count < 12 && { color: colors.red }]}>
         {estimateError
@@ -317,7 +314,7 @@ const styles = StyleSheet.create({
   settingValue: { color: colors.text, fontFamily: fonts.medium, fontSize: 16 },
   settingChevron: { color: colors.secondary, fontSize: 24 },
   estimate: {
-    marginTop: 24,
+    marginTop: 43,
     marginBottom: 8,
     color: colors.green,
     fontFamily: fonts.monoBold,

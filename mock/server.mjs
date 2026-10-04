@@ -304,6 +304,8 @@ export async function handle(request, response, { demoParticipants = 2 } = {}) {
       if (!room) fail(404, 'INVITE_NOT_FOUND', 'Ссылка не работает или была заменена.');
       maybeExpire(room);
       const existing = room.members.find((member) => member.id === user.id);
+      if (room.removedIds?.includes(user.id))
+        fail(403, 'REMOVED', 'Организатор исключил вас из комнаты.');
       if (!existing && !['waiting', 'swiping'].includes(room.status))
         fail(409, 'ROOM_CLOSED', 'Вход в комнату уже закрыт.');
       if (!existing && room.members.length >= room.constraints.partySize)
@@ -324,6 +326,24 @@ export async function handle(request, response, { demoParticipants = 2 } = {}) {
       const user = auth(request);
       if (request.method === 'GET' && !action)
         return send(response, 200, store.serialize(memberRoom(id, user), user));
+      if (request.method === 'POST' && action === 'leave') {
+        const room = memberRoom(id, user);
+        if (room.hostId === user.id) fail(409, 'HOST_CANNOT_LEAVE', 'Создатель может закрыть комнату.');
+        room.members = room.members.filter((member) => member.id !== user.id);
+        delete room.votes[user.id];
+        return send(response, 200, { ok: true });
+      }
+      if (request.method === 'DELETE' && action.startsWith('members/')) {
+        const room = hostRoom(id, user);
+        if (!['waiting', 'swiping'].includes(room.status)) fail(409, 'ROOM_CLOSED', 'Состав комнаты уже нельзя изменить.');
+        const memberId = decodeURIComponent(action.slice('members/'.length));
+        if (memberId === user.id) fail(409, 'HOST_CANNOT_REMOVE_SELF', 'Создатель не может исключить себя.');
+        if (!room.members.some((member) => member.id === memberId)) fail(404, 'MEMBER_NOT_FOUND', 'Участник не найден.');
+        room.members = room.members.filter((member) => member.id !== memberId);
+        room.removedIds.push(memberId);
+        delete room.votes[memberId];
+        return send(response, 200, store.serialize(room, user));
+      }
       if (request.method === 'POST' && action === 'start') {
         const room = hostRoom(id, user);
         if (room.status !== 'waiting' || room.members.length < 2)

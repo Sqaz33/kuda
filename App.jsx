@@ -172,8 +172,13 @@ export default function App() {
           setOffline(false);
           applyRoom(next, screen === 'details');
         }
-      } catch {
-        if (active) setOffline(true);
+      } catch (cause) {
+        if (active) {
+          if (cause.status === 403) {
+            setError('Вы больше не участник этой комнаты.');
+            setScreen('unavailable');
+          } else setOffline(true);
+        }
       }
     }, 4000);
     return () => {
@@ -273,6 +278,17 @@ export default function App() {
   async function cancelRoom() {
     await run(async () => {
       applyRoom(await api.cancelRoom(room.id));
+    });
+  }
+  async function leaveRoom() {
+    await run(async () => {
+      await api.leaveRoom(room.id);
+      await goHome();
+    });
+  }
+  async function removeMember(memberId) {
+    await run(async () => {
+      applyRoom(await api.removeMember(room.id, memberId));
     });
   }
   async function vote(venueId, value) {
@@ -396,6 +412,9 @@ export default function App() {
         onShare={share}
         onRotate={rotateInvite}
         onCancel={cancelRoom}
+        onLeave={leaveRoom}
+        onRemove={removeMember}
+        onRefresh={() => openRoom(room.id)}
         busy={busy}
       />
     );
@@ -452,7 +471,10 @@ export default function App() {
     content = (
       <DetailsScreen
         venue={venue}
+        room={room}
         onBack={() => setScreen(room ? roomScreen(room) : returnTo)}
+        onVote={vote}
+        onFinishEarly={finishEarly}
         onReport={report}
         pending={busy}
       />

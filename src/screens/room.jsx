@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Body, Button, Card, Eyebrow, Notice, Screen, Separator } from '../ui';
 import { colors, common, fonts } from '../theme';
 import { inviteLink } from '../links';
@@ -8,6 +8,7 @@ import {
   AvatarStack,
   BackLink,
   categoryLabel,
+  categorySummary,
   Header,
   isHost,
   MapPreview,
@@ -69,87 +70,180 @@ function MemberRows({ members, hostId }) {
   ));
 }
 
-export function LobbyScreen({ room, user, onBack, onStart, onShare, onRotate, onCancel, busy }) {
-  const host = isHost(room, user);
+function Overlay({ title, children, onClose, style }) {
   return (
-    <Screen
-      footer={
-        host ? (
+    <Modal transparent animationType="fade" visible onRequestClose={onClose}>
+      <View style={styles.overlayShade}>
+        <View style={[styles.overlayCard, style]}>
+          <View style={styles.overlayHeading}>
+            <Text style={styles.overlayTitle}>{title}</Text>
+            <Pressable onPress={onClose} accessibilityRole="button">
+              <Text style={styles.overlayClose}>×</Text>
+            </Pressable>
+          </View>
+          {children}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ReviewOverlay({ onClose }) {
+  return (
+    <Overlay title="Отзывы и фото" onClose={onClose} style={styles.reviewsOverlay}>
+      <View>
+        <Text style={styles.modalRating}>★ 4,9</Text>
+        <Body muted>420 отзывов в карточке источника</Body>
+      </View>
+      <Card style={styles.reviewPlaceholder}>
+        <Eyebrow style={{ color: colors.red }}>ПРИМЕР ПРОТОТИПА</Eyebrow>
+        <Body style={{ marginTop: 20 }}>
+          Фотографии и отзывы будут открываться здесь после подключения источника данных.
+        </Body>
+      </Card>
+      <Button onPress={onClose}>Назад к месту</Button>
+    </Overlay>
+  );
+}
+
+function RoomAvatars({ room, onMember }) {
+  return (
+    <View style={styles.roomAvatars}>
+      {room.members.map((member) => (
+        <Pressable
+          key={member.id}
+          onPress={() => onMember(member)}
+          accessibilityRole="button"
+          style={styles.roomAvatar}
+        >
+          <Text style={styles.roomAvatarText}>{member.name.slice(0, 2).toUpperCase()}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+export function LobbyScreen({
+  room,
+  user,
+  onBack,
+  onStart,
+  onShare,
+  onRotate,
+  onCancel,
+  onLeave,
+  onRemove,
+  onRefresh,
+  busy,
+}) {
+  const host = isHost(room, user);
+  const [member, setMember] = useState(null);
+  const [confirmExit, setConfirmExit] = useState(false);
+  return (
+    <>
+      <Screen
+        footer={
           <>
             <TwoButtons
               left={
                 <Button variant="secondary" onPress={onShare} style={styles.flexButton}>
-                  Поделиться
+                  Поделиться ссылкой
                 </Button>
               }
               right={
                 <Button
-                  onPress={onStart}
+                  variant={host ? 'primary' : 'secondary'}
+                  onPress={host ? onStart : onRefresh}
                   loading={busy}
-                  disabled={room.members.length < 2}
+                  disabled={host && room.members.length < 2}
                   style={styles.flexButton}
                 >
-                  Начать выбор
+                  {host ? 'Начать выбор' : 'Проверить старт'}
                 </Button>
               }
             />
-            {room.members.length < 2 ? (
-              <Text style={styles.footerHint}>ДЛЯ СТАРТА НУЖНО МИНИМУМ 2 ЧЕЛОВЕКА</Text>
-            ) : null}
+            <Text style={styles.footerHint}>КУДА.　 /　 ОДНА КОМНАТА — ОДНО РЕШЕНИЕ</Text>
           </>
-        ) : (
-          <Text style={styles.footerHint}>КОГДА СОЗДАТЕЛЬ НАЧНЁТ, КАРТОЧКИ ПОЯВЯТСЯ ЗДЕСЬ</Text>
-        )
-      }
-    >
-      <Header room={room} />
-      <PageIntro
-        label={host ? '02 / КОМНАТА СОЗДАНА' : '02 / ВЫ В КОМНАТЕ'}
-        title={host ? 'Позовите своих.' : 'Ждём создателя.'}
-        description={
-          host
-            ? 'Отправьте ссылку друзьям. Выбор начнётся, когда компания соберётся.'
-            : 'Вы присоединились. Когда создатель начнёт выбор, здесь появятся карточки мест.'
         }
-      />
-      <Card style={styles.codeCard}>
-        <Eyebrow>КОД КОМНАТЫ</Eyebrow>
-        <Text style={styles.code}>{room.code}</Text>
-        <Text style={styles.codeCaption}>
-          {host ? 'Друзья могут ввести этот код на главной' : 'Сохраните код для повторного входа'}
-        </Text>
-      </Card>
-      <View style={styles.sectionHead}>
-        <Eyebrow>В КОМНАТЕ</Eyebrow>
-        <AvatarStack members={room.members} />
-      </View>
-      <MemberRows members={room.members} hostId={room.hostId} />
-      <Card style={styles.summaryCard}>
-        <Eyebrow>ПЛАН НА ВЕЧЕР</Eyebrow>
-        <Text style={[common.heading, { marginTop: 15 }]}>{meeting(room.constraints)}</Text>
-        <Body muted style={{ marginTop: 7 }}>
-          {areaSummary(room.constraints)}
-        </Body>
-        <Separator />
-        <Eyebrow>
-          {money(room.constraints.budgetMax)} · {room.constraints.partySize} ЧЕЛОВЕКА
-        </Eyebrow>
-      </Card>
-      {host ? (
-        <>
-          <Text selectable style={styles.inviteLink}>
-            {inviteLink(room.inviteToken)}
-          </Text>
-          <Button variant="quiet" onPress={onRotate}>
-            Заменить ссылку приглашения
+      >
+        <Header room={room} />
+        <PageIntro
+          label={host ? '02 / КОМНАТА СОЗДАНА' : '02 / ВЫ В КОМНАТЕ'}
+          title={host ? 'Позовите своих.' : 'Вы в комнате.'}
+          description={
+            host
+              ? `Когда все соберутся, начните выбор. На голосование у компании будет ${room.constraints.deadlineMinutes} минут.`
+              : `Организатор начнёт выбор, когда все соберутся. После старта у вас будет ${room.constraints.deadlineMinutes} минут.`
+          }
+        />
+        <Card style={styles.codeCard}>
+          <Eyebrow>КОД КОМНАТЫ</Eyebrow>
+          <Text style={styles.code}>{room.code}</Text>
+          <Text style={styles.codeCaption}>Отправьте ссылку или продиктуйте код</Text>
+        </Card>
+        <View style={styles.participantSection}>
+          <Eyebrow>
+            УЧАСТНИКИ　 ·　 {room.members.length} ИЗ {room.constraints.partySize}
+          </Eyebrow>
+          <RoomAvatars room={room} onMember={setMember} />
+        </View>
+        <Card style={styles.summaryCard}>
+          <Eyebrow>{meeting(room.constraints).toUpperCase().replace(' · ', '　 ·　 ')}</Eyebrow>
+          <Text style={styles.summaryTitle}>{categorySummary(room.constraints.categories)}</Text>
+          <Body muted style={styles.summaryDetail}>
+            {room.constraints.area.pointAddress || areaSummary(room.constraints)} ·{' '}
+            {money(room.constraints.budgetMax)}
+          </Body>
+        </Card>
+        <View style={styles.roomBottomActions}>
+          <Eyebrow style={{ color: colors.green }}>ВЫ — {host ? 'СОЗДАТЕЛЬ' : 'УЧАСТНИК'}</Eyebrow>
+          <Pressable onPress={() => setConfirmExit(true)} accessibilityRole="button">
+            <Eyebrow style={{ color: colors.red }}>ВЫЙТИ ИЗ КОМНАТЫ</Eyebrow>
+          </Pressable>
+        </View>
+      </Screen>
+      {member ? (
+        <Overlay title="Участник комнаты" onClose={() => setMember(null)}>
+          <View style={styles.modalAvatar}>
+            <Text style={styles.modalInitial}>{member.name.slice(0, 2).toUpperCase()}</Text>
+          </View>
+          <Text style={styles.modalName}>{member.name}</Text>
+          <Eyebrow style={styles.modalRole}>
+            {member.id === room.hostId ? 'СОЗДАТЕЛЬ КОМНАТЫ' : 'УЧАСТНИК'}
+          </Eyebrow>
+          {host && member.id !== room.hostId ? (
+            <Button variant="danger" onPress={() => { onRemove(member.id); setMember(null); }}>
+              Исключить из комнаты
+            </Button>
+          ) : null}
+          <Button onPress={() => setMember(null)}>
+            Закрыть
           </Button>
-          <EndRoom onCancel={onCancel} />
-        </>
-      ) : (
-        <Notice>Ожидаем остальных участников. Экран обновится сам.</Notice>
-      )}
-      <BackLink onPress={onBack} />
-    </Screen>
+        </Overlay>
+      ) : null}
+      {confirmExit ? (
+        <Overlay title="Выйти из комнаты?" onClose={() => setConfirmExit(false)}>
+          <Body muted style={styles.modalBody}>
+            {host
+              ? 'Если вы выйдете, комната закроется для всех участников.'
+              : 'Вы сможете снова войти по ссылке приглашения.'}
+          </Body>
+          <Button
+            variant="danger"
+            onPress={() => {
+              setConfirmExit(false);
+              if (host) onCancel();
+              else onLeave();
+            }}
+          >
+            Выйти из комнаты
+          </Button>
+          <Button variant="quiet" onPress={() => setConfirmExit(false)}>
+            Остаться
+          </Button>
+        </Overlay>
+      ) : null}
+    </>
   );
 }
 
@@ -167,6 +261,8 @@ export function DeckScreen({
   const votes = room.ownVotes || {};
   const current = room.candidates.find((candidate) => !votes[candidate.id]);
   const done = Object.keys(votes).length;
+  const [showVotes, setShowVotes] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
   if (!current)
     return (
       <WaitingScreen
@@ -178,156 +274,221 @@ export function DeckScreen({
       />
     );
   return (
-    <Screen
-      footer={
-        <>
-          <TwoButtons
-            left={
-              <Button
-                variant="secondary"
-                disabled={pending}
-                onPress={() => onVote(current.id, 'dislike')}
-                style={styles.flexButton}
+    <>
+      <Screen
+        footer={
+          <>
+            <TwoButtons
+              left={
+                <Button
+                  variant="secondary"
+                  disabled={pending}
+                  onPress={() => onVote(current.id, 'dislike')}
+                  style={styles.flexButton}
+                >
+                  Пропустить
+                </Button>
+              }
+              right={
+                <Button
+                  loading={pending}
+                  onPress={() => onVote(current.id, 'like')}
+                  style={styles.flexButton}
+                >
+                  Подходит
+                </Button>
+              }
+            />
+            <View style={styles.deckFooterLinks}>
+              <Pressable onPress={() => setShowVotes(true)} accessibilityRole="button">
+                <Text style={styles.deckFooterText}>
+                  ПОСМОТРЕТЬ СОВПАДЕНИЯ:{' '}
+                  {Object.values(votes).filter((value) => value === 'like').length}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={onFinishEarly}
+                disabled={done < 10 || pending}
+                accessibilityRole="button"
               >
-                Пропустить
-              </Button>
-            }
-            right={
-              <Button
-                loading={pending}
-                onPress={() => onVote(current.id, 'like')}
-                style={styles.flexButton}
-              >
-                Подходит
-              </Button>
-            }
-          />
-          <Text style={styles.footerHint}>ВАШ ВЫБОР НЕ ВИДЕН ДРУГИМ ДО ИТОГА</Text>
-        </>
-      }
-    >
-      <Header room={room} center={`ВЫБОР · ${done + 1} / ${room.candidates.length}`} />
-      <View style={styles.deckTop}>
-        <Eyebrow>03 / ВЫБИРАЕМ МЕСТО</Eyebrow>
-        <Text style={styles.deckCount}>
-          {String(done + 1).padStart(2, '0')}
-          <Text style={styles.deckTotal}> / {room.candidates.length}</Text>
-        </Text>
-      </View>
-      <View style={styles.progress}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${Math.round((done / room.candidates.length) * 100)}%` },
-          ]}
-        />
-      </View>
-      <VenueImage venue={current} height={310} badge="МЕСТО ДЛЯ ВАШЕГО ВЕЧЕРА" />
-      <VenueMeta venue={current} />
-      <Text style={[common.title, styles.venueTitle]}>{current.name}</Text>
-      <Body muted>
-        {current.cuisine || 'Кухня уточняется'} · {current.tags?.join(' · ') || 'Для компании'}
-      </Body>
-      <Pressable
-        onPress={() => onDetail(current)}
-        accessibilityRole="button"
-        style={styles.detailLink}
+                <Text style={[styles.deckFooterText, done < 10 && { color: colors.secondary }]}>
+                  ЗАВЕРШИТЬ ГОЛОСОВАНИЕ
+                </Text>
+              </Pressable>
+            </View>
+          </>
+        }
       >
-        <Text style={styles.detailLinkText}>АДРЕС И ПОДРОБНОСТИ ↗</Text>
-      </Pressable>
-      <MapPreview onPress={() => onDetail(current)} />
-      {done >= 10 ? (
-        <Button
-          variant="quiet"
-          disabled={pending}
-          onPress={onFinishEarly}
-          style={styles.extraAction}
+        <Header
+          room={room}
+          center={`${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${room.candidates.length}`}
+          onExit={() => setConfirmExit(true)}
+        />
+        <View style={styles.deckPhoto}>
+          <VenueImage venue={current} height={378} badge="★ 4,9　·　420 ОТЗЫВОВ" />
+        </View>
+        <Eyebrow style={styles.deckCategory}>
+          {categoryLabel(current.category)}
+          {current.category === 'bar' ? ' · коктейли' : ''}
+        </Eyebrow>
+        <Text style={styles.deckVenueName}>{current.name}</Text>
+        <View style={styles.deckAddress}>
+          <Body muted>{current.address}</Body>
+          <Text style={styles.walk}>15 мин пешком · 1,2 км</Text>
+        </View>
+        <View style={styles.deckFact}>
+          <Eyebrow style={{ color: colors.green }}>●　ОТКРЫТО ДО 04:00</Eyebrow>
+          <Eyebrow>≈ {current.priceHint?.replace('Ориентир ', '') || '2 000 ₽/ЧЕЛ.'}</Eyebrow>
+        </View>
+        <View style={styles.deckFact}>
+          <Eyebrow>КУХНЯ</Eyebrow>
+          <Text style={styles.factValue}>{current.cuisine || 'Авторская кухня'}</Text>
+        </View>
+        <View style={styles.deckFact}>
+          <Eyebrow>ФОРМАТ</Eyebrow>
+          <Text style={styles.factValue}>
+            {categoryLabel(current.category)} · {current.tags?.[0] || 'для компании'}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => onDetail(current)}
+          style={styles.mapHeading}
+          accessibilityRole="button"
         >
-          Закончить выбор сейчас
-        </Button>
+          <Eyebrow>ГДЕ НАХОДИТСЯ　↓</Eyebrow>
+        </Pressable>
+        <MapPreview onPress={() => onDetail(current)} />
+      </Screen>
+      {showVotes ? (
+        <Overlay title="Ваш выбор" onClose={() => setShowVotes(false)}>
+          <Body muted>
+            Отмечено «подходит»: {Object.values(votes).filter((value) => value === 'like').length}.
+            Общие совпадения появятся после завершения голосования.
+          </Body>
+          <Button variant="secondary" onPress={() => setShowVotes(false)}>
+            К карточкам
+          </Button>
+        </Overlay>
       ) : null}
-      {isHost(room, user) ? <EndRoom onCancel={onCancel} /> : null}
-      <BackLink onPress={onBack} />
-    </Screen>
+      {confirmExit ? (
+        <Overlay title="Выйти из комнаты?" onClose={() => setConfirmExit(false)}>
+          <Body muted>Ваши ответы сохранятся. Вы сможете вернуться по коду комнаты.</Body>
+          <Button variant="secondary" onPress={onBack}>
+            Выйти
+          </Button>
+          <Button variant="quiet" onPress={() => setConfirmExit(false)}>
+            Остаться
+          </Button>
+        </Overlay>
+      ) : null}
+    </>
   );
 }
 
 export function WaitingScreen({ room, user, onBack, onFinish, onCancel, onRefresh }) {
   const finished = room.members.filter((member) => member.finished).length;
-  const canFinish = isHost(room, user) && Date.now() >= Date.parse(room.deadlineAt);
+  const allFinished = finished === room.members.length;
+  const canFinish =
+    isHost(room, user) && (allFinished || Date.now() >= Date.parse(room.deadlineAt));
   return (
     <Screen
       footer={
         <Button onPress={canFinish ? onFinish : onRefresh} disabled={!canFinish && !onRefresh}>
-          {canFinish ? 'Подвести итог' : 'Проверить статус'}
+          {canFinish ? 'Посмотреть результат' : 'Проверить статус'}
         </Button>
       }
     >
       <Header room={room} />
       <PageIntro
-        label="04 / ЖДЁМ КОМПАНИЮ"
-        title="Ваш выбор готов."
-        description="Когда все закончат, покажем места, которые подошли компании."
+        label="06 / ВЫБОР ЗАВЕРШЁН"
+        title={allFinished ? 'Все закончили.' : 'Ждём остальных.'}
+        description={
+          allFinished
+            ? 'Все участники сделали выбор. Результат готов.'
+            : 'Ваши ответы сохранены. Результат появится, когда все закончат или истечёт время.'
+        }
       />
-      <Card style={styles.waitingCard}>
-        <Eyebrow>УЧАСТНИКИ</Eyebrow>
-        <Text style={styles.bigCount}>
-          {finished}
-          <Text style={styles.countSuffix}> / {room.members.length}</Text>
-        </Text>
-        <Body muted>закончили выбор мест</Body>
-      </Card>
-      <View style={styles.sectionHead}>
-        <Eyebrow>КОМПАНИЯ</Eyebrow>
-        <AvatarStack members={room.members} />
+      <View style={styles.resultNotice}>
+        <Notice title="ВАШИ ГОЛОСА СОХРАНЕНЫ">
+          {allFinished
+            ? 'Компания закончила выбор. Можно смотреть итог.'
+            : 'Ещё один участник выбирает заведения.'}
+        </Notice>
       </View>
-      <MemberRows members={room.members} hostId={room.hostId} />
-      <Notice title="ГОЛОСА ПОКА СКРЫТЫ">
-        Итог появится после голосования или когда закончится время.
-      </Notice>
-      {isHost(room, user) ? <EndRoom onCancel={onCancel} /> : null}
-      <BackLink onPress={onBack} />
+      <Card style={styles.finishedCard}>
+        <Text style={styles.finishedNumber}>{String(finished).padStart(2, '0')}</Text>
+        <View>
+          <Text style={styles.finishedTitle}>из {room.members.length} закончили</Text>
+          <Eyebrow style={styles.finishedNames}>
+            {room.members
+              .filter((member) => member.finished)
+              .map((member) => member.name)
+              .join(' · ')}
+          </Eyebrow>
+        </View>
+      </Card>
     </Screen>
   );
 }
 
 export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend, onCancel }) {
   const matches = room.matches || [];
-  const [selected, setSelected] = useState(matches[0]?.venue.id);
   const host = isHost(room, user);
   const unanimous = room.matchMode === 'unanimous';
+  const [selected, setSelected] = useState(unanimous ? matches[0]?.venue.id : null);
   return (
     <Screen
       footer={
         host && matches.length ? (
           <Button loading={pending} disabled={!selected} onPress={() => onChoose(selected)}>
-            Выбрать место
+            {selected && !unanimous
+              ? `Подтвердить: ${matches.find((match) => match.venue.id === selected)?.venue.name}`
+              : unanimous
+                ? 'Выбрать место'
+                : 'Сначала выберите место'}
           </Button>
-        ) : null
+        ) : (
+          <Button variant="secondary" onPress={onBack}>
+            Проверить результат
+          </Button>
+        )
       }
     >
       <Header room={room} />
       <PageIntro
-        label="03 / РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ"
+        label={unanimous ? '03 / РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ' : 'ПОСЛЕ ДЕДЛАЙНА'}
         title={
           unanimous
             ? 'Есть совпадение.'
             : matches.length
-              ? 'Нашлось большинство.'
+              ? 'Почти сошлись.'
               : 'Пока без совпадений.'
         }
         description={
           unanimous
-            ? 'Одно место понравилось всем. Создатель подтвердит его для компании.'
+            ? 'Одно место понравилось всем. Вы создатель — подтвердите его для компании.'
             : matches.length
-              ? 'Показываем поддержку компании в числах. Организатор подтвердит одно место.'
-              : 'Попробуйте добавить места в общую колоду.'
+              ? host
+                ? 'Выберите одно из трёх мест, затем подтвердите решение.'
+                : 'Создатель выберет одно из трёх мест для компании.'
+              : 'Ни одно место не набрало достаточно голосов.'
         }
       />
-      {room.incomplete ? (
-        <Notice title="НЕ ВСЕ УСПЕЛИ" tone="warning">
-          Итог посчитан по ответившим участникам.
-        </Notice>
+      {!unanimous && matches.length ? (
+        <View style={styles.resultNotice}>
+          <Notice
+            title={
+              host
+                ? selected
+                  ? `ВЫБРАНО: ${matches.find((match) => match.venue.id === selected)?.venue.name.toUpperCase()}`
+                  : 'ВЫБОР ЗА КОМПАНИЕЙ'
+                : 'РЕШЕНИЕ ЗА СОЗДАТЕЛЕМ'
+            }
+          >
+            {room.incomplete ? 'Не все участники успели ответить. ' : ''}Три места получили
+            поддержку компании.
+          </Notice>
+        </View>
       ) : null}
       <View style={styles.matchesList}>
         {matches.map((match, index) => (
@@ -336,24 +497,28 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
             onPress={() => host && setSelected(match.venue.id)}
             accessibilityRole="button"
             accessibilityState={{ selected: selected === match.venue.id }}
-            style={[styles.matchCard, selected === match.venue.id && host && styles.matchSelected]}
+            style={[
+              styles.matchCard,
+              !unanimous && styles.majorityRow,
+              selected === match.venue.id && host && !unanimous && styles.matchSelected,
+            ]}
           >
-            <View style={styles.matchPhoto}>
-              <VenueImage venue={match.venue} height={144} />
-              {!unanimous ? (
-                <Text style={styles.matchNumber}>{String(index + 1).padStart(2, '0')}</Text>
-              ) : null}
-            </View>
+            {unanimous ? (
+              <View style={styles.matchPhoto}>
+                <VenueImage venue={match.venue} height={144} />
+              </View>
+            ) : (
+              <Text style={styles.majorityNumber}>{String(index + 1).padStart(2, '0')}</Text>
+            )}
             <View style={styles.matchDetails}>
-              <VenueMeta venue={match.venue} />
+              {unanimous ? <VenueMeta venue={match.venue} /> : null}
               <Text style={styles.matchName}>{match.venue.name}</Text>
               <Text style={styles.matchVotes}>
-                {match.likes} из {match.total} выбрали
+                {unanimous
+                  ? `✓　${match.likes} / ${match.total} ГОЛОСА`
+                  : `${match.likes} / ${match.total}　·　${categoryLabel(match.venue.category).toUpperCase()}`}
               </Text>
             </View>
-            <Text style={styles.matchArrow}>
-              {host ? (selected === match.venue.id ? '●' : '○') : '↗'}
-            </Text>
           </Pressable>
         ))}
       </View>
@@ -362,142 +527,212 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
           Добавить кандидатов
         </Button>
       ) : null}
-      {!host && matches.length ? (
-        <Notice>Организатор выберет одно место. Результат появится здесь у всех.</Notice>
-      ) : null}
-      {host ? <EndRoom onCancel={onCancel} /> : null}
-      <BackLink onPress={onBack} />
     </Screen>
   );
 }
 
 export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, pending }) {
+  const [showContact, setShowContact] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
   const venue = room.winner;
   if (!venue) return <UnavailableScreen reason="Итог встречи ещё загружается." onHome={onBack} />;
   const mapUrl = venue.mapUrl || `https://maps.google.com/?q=${encodeURIComponent(venue.address)}`;
   return (
-    <Screen
-      footer={
-        <TwoButtons
-          left={
-            <Button
-              variant={venue.phone ? 'primary' : 'secondary'}
-              disabled={!venue.phone}
-              onPress={() => onAction('phone', `tel:${venue.phone}`)}
-              style={styles.flexButton}
-            >
-              Позвонить
-            </Button>
-          }
-          right={
-            <Button
-              variant={venue.phone ? 'secondary' : 'primary'}
-              onPress={() => onAction('map', mapUrl)}
-              style={styles.flexButton}
-            >
-              Маршрут ↗
-            </Button>
-          }
+    <>
+      <Screen
+        footer={
+          <TwoButtons
+            left={
+              <Button onPress={() => setShowContact(true)} style={styles.flexButton}>
+                Позвонить
+              </Button>
+            }
+            right={
+              <Button
+                variant="secondary"
+                onPress={() => onAction('map', mapUrl)}
+                style={styles.flexButton}
+              >
+                Маршрут ↗
+              </Button>
+            }
+          />
+        }
+      >
+        <Header room={room} />
+        <PageIntro
+          label="04 / ВЕЧЕР РЕШЁН"
+          title={venue.name}
+          description={`${meeting(room.constraints)} · ${room.members.length} участников`}
         />
-      }
-    >
-      <Header room={room} />
-      <PageIntro
-        label="04 / ВЕЧЕР РЕШЁН"
-        title={venue.name}
-        description={`${meeting(room.constraints)} · ${room.members.length} участников`}
-      />
-      <View style={styles.resultVenue}>
-        <VenueImage venue={venue} height={280} badge="ВАШ ВЫБОР" />
-        <Card style={styles.resultInfo}>
-          <Text style={styles.address}>{venue.address.toUpperCase()}</Text>
-          <Eyebrow style={{ marginTop: 12 }}>{areaSummary(room.constraints).toUpperCase()}</Eyebrow>
-          <Separator />
-          <Text
-            style={[
-              styles.bookingStatus,
-              { color: room.bookingNote === 'booked_by_host' ? colors.green : colors.red },
-            ]}
-          >
-            {room.bookingNote === 'booked_by_host'
-              ? 'СТОЛИК ЗАБРОНИРОВАН ОРГАНИЗАТОРОМ'
-              : room.bookingNote === 'walk_in'
-                ? 'ИДЁМ БЕЗ БРОНИ'
-                : 'СТОЛИК ПОКА НЕ ЗАБРОНИРОВАН'}
-          </Text>
-          <Eyebrow style={{ marginTop: 15 }}>ПОЗВОНИТЕ В ЗАВЕДЕНИЕ ПЕРЕД ПОЕЗДКОЙ</Eyebrow>
-        </Card>
-        <Pressable onPress={() => onDetail(venue)} style={styles.detailLink}>
-          <Text style={styles.detailLinkText}>ПОДРОБНОСТИ О МЕСТЕ ↗</Text>
-        </Pressable>
-      </View>
-      <MapPreview onPress={() => onAction('map', mapUrl)} />
-      {isHost(room, user) ? (
-        <View style={styles.booking}>
-          <Eyebrow>ЧТО С БРОНЬЮ?</Eyebrow>
-          <Body muted style={{ marginVertical: 15 }}>
-            Отметьте результат после звонка. Приложение не бронирует столик.
-          </Body>
-          <Button variant="secondary" loading={pending} onPress={() => onNote('booked_by_host')}>
-            Я забронировал столик
-          </Button>
-          <Button variant="quiet" loading={pending} onPress={() => onNote('walk_in')}>
-            Идём без брони
-          </Button>
+        <View style={styles.resultVenue}>
+          <Pressable onPress={() => setShowReviews(true)} accessibilityRole="button">
+            <VenueImage venue={venue} height={281} badge="★ 4,9　·　420 ОТЗЫВОВ" />
+          </Pressable>
+          <Card style={styles.resultInfo}>
+            <Text style={styles.address}>{venue.address.toUpperCase()}</Text>
+            <Eyebrow style={{ marginTop: 18 }}>15 МИН ПЕШКОМ ОТ ТОЧКИ ВСТРЕЧИ</Eyebrow>
+            <Separator />
+            <Text
+              style={[
+                styles.bookingStatus,
+                { color: room.bookingNote === 'booked_by_host' ? colors.green : colors.red },
+              ]}
+            >
+              {room.bookingNote === 'booked_by_host'
+                ? 'СТОЛИК ЗАБРОНИРОВАН ОРГАНИЗАТОРОМ'
+                : room.bookingNote === 'walk_in'
+                  ? 'ИДЁМ БЕЗ БРОНИ'
+                  : 'СТОЛИК ПОКА НЕ ЗАБРОНИРОВАН'}
+            </Text>
+            <Eyebrow style={{ marginTop: 15 }}>ПОЗВОНИТЕ В ЗАВЕДЕНИЕ ПЕРЕД ПОЕЗДКОЙ</Eyebrow>
+          </Card>
         </View>
+        <MapPreview onPress={() => onAction('map', mapUrl)} />
+        {isHost(room, user) ? (
+          <View style={styles.booking}>
+            <Eyebrow>ЧТО С БРОНЬЮ?</Eyebrow>
+            <Body muted style={{ marginVertical: 15 }}>
+              Отметьте результат после звонка. Приложение не бронирует столик.
+            </Body>
+            <Button variant="secondary" loading={pending} onPress={() => onNote('booked_by_host')}>
+              Я забронировал столик
+            </Button>
+            <Button variant="quiet" loading={pending} onPress={() => onNote('walk_in')}>
+              Идём без брони
+            </Button>
+          </View>
+        ) : null}
+        <BackLink onPress={onBack} />
+      </Screen>
+      {showContact ? (
+        <Overlay title="Контакт заведения" onClose={() => setShowContact(false)}>
+          <Body muted>
+            {venue.phone
+              ? `Телефон: ${venue.phone}`
+              : 'В этой демонстрационной карточке телефон не указан. Уточните контакт заведения перед поездкой.'}
+          </Body>
+          <Button
+            onPress={() => {
+              setShowContact(false);
+              if (venue.phone) onAction('phone', `tel:${venue.phone}`);
+            }}
+          >
+            {venue.phone ? 'Позвонить' : 'Понятно'}
+          </Button>
+        </Overlay>
       ) : null}
-      <BackLink onPress={onBack} />
-    </Screen>
+      {showReviews ? <ReviewOverlay onClose={() => setShowReviews(false)} /> : null}
+    </>
   );
 }
 
-export function DetailsScreen({ venue, onBack, onReport, pending }) {
+export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onReport, pending }) {
+  const [showReviews, setShowReviews] = useState(false);
+  const voting = room?.status === 'swiping';
+  const votes = room?.ownVotes || {};
+  const done = Object.keys(votes).length;
   return (
-    <Screen
-      footer={
-        <Button variant="secondary" onPress={onBack}>
-          Вернуться к выбору
-        </Button>
-      }
-    >
-      <Header center="О МЕСТЕ" />
-      <BackLink onPress={onBack} children="НАЗАД" />
-      <VenueImage venue={venue} height={310} />
-      <VenueMeta venue={venue} />
-      <Text style={[common.title, styles.venueTitle]}>{venue.name}</Text>
-      <Body muted>{venue.cuisine || 'Кухня уточняется'}</Body>
-      <Separator />
-      <Eyebrow>АДРЕС</Eyebrow>
-      <Body style={styles.detailBody}>{venue.address}</Body>
-      <Eyebrow>ЧАСЫ РАБОТЫ</Eyebrow>
-      <Body style={styles.detailBody}>{venue.hoursLabel || 'Уточняются'}</Body>
-      {venue.phone ? (
-        <Button variant="secondary" onPress={() => Linking.openURL(`tel:${venue.phone}`)}>
-          Позвонить
-        </Button>
-      ) : null}
-      {venue.website ? (
-        <Button
-          variant="secondary"
-          onPress={() => Linking.openURL(venue.website)}
-          style={styles.extraAction}
-        >
-          Открыть сайт
-        </Button>
-      ) : null}
-      <Separator />
-      <Eyebrow>НАШЛИ ОШИБКУ?</Eyebrow>
-      <Button variant="quiet" loading={pending} onPress={() => onReport(venue.id, 'closed')}>
-        Заведение закрыто
-      </Button>
-      <Button
-        variant="quiet"
-        loading={pending}
-        onPress={() => onReport(venue.id, 'incorrect_data')}
+    <>
+      <Screen
+        footer={
+          voting ? (
+            <>
+              <TwoButtons
+                left={
+                  <Button
+                    variant="secondary"
+                    loading={pending}
+                    onPress={() => onVote(venue.id, 'dislike')}
+                    style={styles.flexButton}
+                  >
+                    Пропустить
+                  </Button>
+                }
+                right={
+                  <Button
+                    loading={pending}
+                    onPress={() => onVote(venue.id, 'like')}
+                    style={styles.flexButton}
+                  >
+                    Подходит
+                  </Button>
+                }
+              />
+              <View style={styles.deckFooterLinks}>
+                <Text style={styles.deckFooterText}>
+                  ПОСМОТРЕТЬ СОВПАДЕНИЯ:{' '}
+                  {Object.values(votes).filter((value) => value === 'like').length}
+                </Text>
+                <Pressable disabled={done < 10} onPress={onFinishEarly}>
+                  <Text style={[styles.deckFooterText, done < 10 && { color: colors.secondary }]}>
+                    ЗАВЕРШИТЬ ГОЛОСОВАНИЕ
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <Button variant="secondary" onPress={onBack}>
+              Назад к месту
+            </Button>
+          )
+        }
       >
-        Неверные данные
-      </Button>
-    </Screen>
+        <Header
+          room={room}
+          center={
+            voting
+              ? `${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${room.candidates.length}`
+              : 'О МЕСТЕ'
+          }
+          onExit={onBack}
+        />
+        <View style={styles.detailsNav}>
+          <Text style={styles.detailsName}>{venue.name}</Text>
+          <Pressable onPress={onBack} accessibilityRole="button">
+            <Eyebrow>К НАЧАЛУ ↑</Eyebrow>
+          </Pressable>
+        </View>
+        <MapPreview height={285} onPress={() => Linking.openURL(venue.mapUrl)}>
+          <View style={styles.mapAddress}>
+            <Text style={styles.mapAddressText}>{venue.address}</Text>
+            <Eyebrow>МАРШРУТ ↗</Eyebrow>
+          </View>
+        </MapPreview>
+        <Eyebrow style={styles.detailsLabel}>О МЕСТЕ</Eyebrow>
+        <Card style={styles.aboutCard}>
+          <Text style={styles.aboutText}>
+            {venue.id === 'venue-1'
+              ? 'Коктейльный бар с авторскими напитками и тапас.'
+              : `${categoryLabel(venue.category)} для компании. ${venue.cuisine || 'Кухня уточняется'}.`}
+          </Text>
+          <Separator />
+          <View style={styles.aboutTags}>
+            <Eyebrow>{categoryLabel(venue.category).toUpperCase()}</Eyebrow>
+            <Eyebrow>{venue.tags?.[0]?.toUpperCase()}</Eyebrow>
+            <Eyebrow>ДО 04:00</Eyebrow>
+          </View>
+        </Card>
+        <Eyebrow style={styles.detailsLabel}>ОТЗЫВЫ И ФОТО</Eyebrow>
+        <Pressable
+          onPress={() => setShowReviews(true)}
+          accessibilityRole="button"
+          style={styles.reviewCard}
+        >
+          <Text style={styles.reviewRating}>★ 4,9</Text>
+          <Text style={styles.reviewLink}>420 ОТЗЫВОВ · СМОТРЕТЬ ФОТОГРАФИИ ↗</Text>
+        </Pressable>
+        <View style={styles.reportLinks}>
+          <Pressable onPress={() => onReport(venue.id, 'closed')}>
+            <Eyebrow>ЗАВЕДЕНИЕ ЗАКРЫТО?</Eyebrow>
+          </Pressable>
+          <Pressable onPress={() => onReport(venue.id, 'incorrect_data')}>
+            <Eyebrow>НЕВЕРНЫЕ ДАННЫЕ?</Eyebrow>
+          </Pressable>
+        </View>
+      </Screen>
+      {showReviews ? <ReviewOverlay onClose={() => setShowReviews(false)} /> : null}
+    </>
   );
 }
 
@@ -525,15 +760,71 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 14,
   },
-  codeCard: { marginTop: 42, alignItems: 'center', paddingVertical: 31 },
+  codeCard: { marginTop: 42, paddingVertical: 23, minHeight: 169 },
   code: {
     color: colors.text,
     fontFamily: fonts.monoBold,
     fontSize: 56,
-    letterSpacing: 12,
-    marginTop: 13,
+    letterSpacing: 6,
+    marginTop: 22,
   },
-  codeCaption: { ...common.small, marginTop: 8 },
+  codeCaption: { ...common.small, marginTop: 1 },
+  participantSection: { marginTop: 38 },
+  roomAvatars: { flexDirection: 'row', gap: 13, marginTop: 28 },
+  roomAvatar: {
+    width: 45,
+    height: 45,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceRaised,
+  },
+  roomAvatarText: { color: colors.text, fontFamily: fonts.bold, fontSize: 11 },
+  summaryTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 21, marginTop: 20 },
+  summaryDetail: { marginTop: 16 },
+  roomBottomActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+    marginBottom: 4,
+  },
+  overlayShade: {
+    flex: 1,
+    backgroundColor: '#000A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  overlayCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 20,
+    gap: 15,
+  },
+  overlayHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomColor: colors.border, borderBottomWidth: 1, paddingBottom: 15 },
+  overlayTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 22 },
+  overlayClose: { color: colors.secondary, fontSize: 27 },
+  modalAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.borderStrong,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  modalInitial: { color: colors.text, fontFamily: fonts.bold, fontSize: 19 },
+  modalName: { color: colors.text, fontFamily: fonts.bold, fontSize: 22, textAlign: 'center' },
+  modalRole: { textAlign: 'center', marginBottom: 14 },
+  modalBody: { marginVertical: 10 },
+  modalRating: { color: colors.text, fontFamily: fonts.bold, fontSize: 28 },
+  reviewsOverlay: { minHeight: 440, justifyContent: 'space-between' },
+  reviewPlaceholder: { minHeight: 144 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -560,9 +851,42 @@ const styles = StyleSheet.create({
   memberInitial: { color: colors.text, fontFamily: fonts.bold, fontSize: 15 },
   memberName: { color: colors.text, fontFamily: fonts.medium, fontSize: 14 },
   memberStatus: { color: colors.green, fontFamily: fonts.mono, fontSize: 10 },
-  summaryCard: { marginTop: 26 },
+  summaryCard: { marginTop: 40, minHeight: 150 },
   inviteLink: { ...common.small, marginTop: 24 },
   endRoom: { marginTop: 30 },
+  deckPhoto: { marginTop: -12 },
+  deckCategory: { marginTop: 23 },
+  deckVenueName: {
+    color: colors.text,
+    fontFamily: fonts.bold,
+    fontSize: 32,
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  deckAddress: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  walk: { color: colors.text, fontFamily: fonts.medium, fontSize: 13 },
+  deckFact: {
+    minHeight: 47,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  factValue: { color: colors.text, fontFamily: fonts.medium, fontSize: 13 },
+  mapHeading: { borderTopColor: colors.border, borderTopWidth: 1, paddingTop: 18 },
+  deckFooterLinks: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    paddingBottom: 0,
+  },
+  deckFooterText: { color: colors.text, fontFamily: fonts.monoBold, fontSize: 9 },
   deckTop: {
     marginTop: 6,
     flexDirection: 'row',
@@ -591,9 +915,20 @@ const styles = StyleSheet.create({
   },
   extraAction: { marginTop: 22 },
   waitingCard: { marginTop: 45, paddingVertical: 27 },
+  finishedCard: {
+    marginTop: 25,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 30,
+    paddingVertical: 18,
+  },
+  finishedNumber: { color: colors.red, fontFamily: fonts.monoBold, fontSize: 13, marginTop: 4 },
+  finishedTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 18 },
+  finishedNames: { marginTop: 12 },
+  resultNotice: { marginTop: 40 },
   bigCount: { color: colors.text, fontFamily: fonts.number, fontSize: 72, marginTop: 14 },
   countSuffix: { color: colors.muted, fontSize: 29 },
-  matchesList: { marginTop: 35, gap: 10 },
+  matchesList: { marginTop: 52, gap: 16 },
   matchCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,6 +940,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   matchSelected: { borderColor: colors.red },
+  majorityRow: { height: 91, paddingHorizontal: 17, gap: 30 },
+  majorityNumber: { color: colors.red, fontFamily: fonts.monoBold, fontSize: 13 },
   matchPhoto: { width: 144, height: 144 },
   matchNumber: {
     position: 'absolute',
@@ -624,5 +961,49 @@ const styles = StyleSheet.create({
   bookingStatus: { fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.8 },
   booking: { marginTop: 30 },
   detailBody: { marginTop: 12, marginBottom: 24 },
+  detailsNav: {
+    marginTop: -30,
+    height: 54,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailsName: { color: colors.text, fontFamily: fonts.bold, fontSize: 20 },
+  mapAddress: {
+    position: 'absolute',
+    bottom: 14,
+    left: 12,
+    right: 12,
+    minHeight: 42,
+    borderRadius: 4,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  mapAddressText: { color: colors.text, fontFamily: fonts.semibold, fontSize: 13 },
+  detailsLabel: { marginTop: 24, marginBottom: 18 },
+  aboutCard: { minHeight: 169 },
+  aboutText: { color: colors.text, fontFamily: fonts.medium, fontSize: 16, lineHeight: 21 },
+  aboutTags: { flexDirection: 'row', gap: 12 },
+  reviewCard: {
+    minHeight: 70,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 5,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  reviewRating: { color: colors.text, fontFamily: fonts.bold, fontSize: 22 },
+  reviewLink: { color: colors.secondary, fontFamily: fonts.mono, fontSize: 9 },
+  reportLinks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
   unavailable: { marginTop: 75 },
 });

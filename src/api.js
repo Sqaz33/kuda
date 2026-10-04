@@ -95,6 +95,8 @@ export const api = {
     request(`/v1/rooms/${encodeURIComponent(id)}/rotate-invite`, { method: 'POST', body: {} }),
   cancelRoom: (id) =>
     request(`/v1/rooms/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: {} }),
+  leaveRoom: (id) => request(`/v1/rooms/${encodeURIComponent(id)}/leave`, { method: 'POST', body: {} }),
+  removeMember: (id, memberId) => request(`/v1/rooms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' }),
   vote: (id, venueId, value, userId) =>
     request(`/v1/rooms/${encodeURIComponent(id)}/votes`, {
       method: 'PUT',

@@ -148,7 +148,11 @@ export function Chips({ options, value, onChange, multiple = false }) {
                   : [option.value],
               )
             }
-            style={[styles.chip, selected && styles.selectedChip]}
+            style={[
+              styles.chip,
+              option.width && { width: option.width },
+              selected && styles.selectedChip,
+            ]}
           >
             <Text style={[styles.chipText, selected && styles.selectedChipText]}>
               {option.label}
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   shell: { flex: 1, width: '100%', maxWidth: 438, alignSelf: 'center' },
   content: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 24 },
-  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8, backgroundColor: colors.bg },
+  footer: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 33, backgroundColor: colors.bg },
   brandBar: {
     minHeight: 65,
     flexDirection: 'row',
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.surface,
   },
-  selectedChip: { borderColor: colors.red },
+  selectedChip: { borderColor: colors.text, backgroundColor: colors.text },
   chipText: {
     color: colors.secondary,
     fontFamily: fonts.mono,
@@ -274,7 +278,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
-  selectedChipText: { color: colors.text },
+  selectedChipText: { color: colors.onPrimary },
   notice: {
     gap: 18,
     marginVertical: 10,

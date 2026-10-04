@@ -4,9 +4,9 @@ import { Body, Brand, Eyebrow } from '../ui';
 import { colors, common, fonts } from '../theme';
 
 export const categories = [
-  { value: 'bar', label: 'Бар' },
-  { value: 'restaurant', label: 'Ресторан' },
-  { value: 'cafe', label: 'Кафе' },
+  { value: 'bar', label: 'Бар', width: 88 },
+  { value: 'restaurant', label: 'Ресторан', width: 130 },
+  { value: 'cafe', label: 'Кафе', width: 88 },
 ];
 
 export const districts = [
@@ -57,7 +57,7 @@ export function Topline({ room, center, onAccount }) {
         <View style={styles.redDot} />
         <Text style={styles.topText}>{room ? `КОМНАТА #${room.code}` : 'ВОЛГОГРАД'}</Text>
       </View>
-      <Text style={styles.topCenter} numberOfLines={1}>
+      <Text style={styles.topCenter} numberOfLines={2}>
         {center || (room ? meeting(room.constraints).toUpperCase() : 'СЕГОДНЯ · 19:30')}
       </Text>
       <Pressable onPress={onAccount} style={styles.topRight} accessibilityRole="button">
@@ -86,11 +86,24 @@ export function AvatarStack({ members = [], compact = false }) {
   );
 }
 
-export function Header({ room, center, onAccount }) {
+export function Header({ room, center, onAccount, onExit }) {
   return (
     <>
       <Topline room={room} center={center} onAccount={onAccount} />
-      <Brand right={room ? <AvatarStack members={room.members} compact /> : null} />
+      <Brand
+        right={
+          room ? (
+            <View style={styles.headerActions}>
+              {onExit ? (
+                <Pressable onPress={onExit} accessibilityRole="button">
+                  <Text style={styles.exitText}>Выйти ↗</Text>
+                </Pressable>
+              ) : null}
+              <AvatarStack members={room.members} compact />
+            </View>
+          ) : null
+        }
+      />
     </>
   );
 }
@@ -142,14 +155,16 @@ export function VenueImage({ venue, height = 281, badge }) {
   );
 }
 
-export function MapPreview({ onPress }) {
+export function MapPreview({ onPress, height = 105, children }) {
   return (
-    <Pressable onPress={onPress} style={styles.map} accessibilityRole="button">
+    <Pressable onPress={onPress} style={[styles.map, { height }]} accessibilityRole="button">
       <View style={styles.mapRoadVertical} />
-      <View style={styles.mapRoadHorizontal} />
+      <View style={styles.mapRoadVerticalRight} />
+      <View style={[styles.mapRoadHorizontal, { top: Math.round(height / 2) }]} />
       <View style={styles.mapBlockOne} />
       <View style={styles.mapBlockTwo} />
       <View style={styles.mapPin} />
+      {children}
     </Pressable>
   );
 }
@@ -200,6 +215,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   avatarStack: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  exitText: { color: colors.secondary, fontFamily: fonts.medium, fontSize: 11 },
   avatarRow: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     width: 42,
@@ -251,8 +268,15 @@ const styles = StyleSheet.create({
   mapRoadVertical: {
     position: 'absolute',
     width: 5,
-    height: 140,
+    height: '100%',
     left: '35%',
+    backgroundColor: '#363840',
+  },
+  mapRoadVerticalRight: {
+    position: 'absolute',
+    width: 5,
+    height: '100%',
+    left: '65%',
     backgroundColor: '#363840',
   },
   mapRoadHorizontal: {
