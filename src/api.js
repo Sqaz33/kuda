@@ -1,14 +1,14 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { createApiClient } from './api-client';
+import { resolveApiBase } from './api-config';
 
-const defaultBase =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:8787'
-    : Platform.OS === 'web'
-      ? `http://${window.location.hostname}:8787`
-      : 'http://localhost:8787';
-export const API_BASE = (process.env.EXPO_PUBLIC_API_URL || defaultBase).replace(/\/$/, '');
+export const API_BASE = resolveApiBase({
+  configured: process.env.EXPO_PUBLIC_API_URL,
+  platform: Platform.OS,
+  hostname: typeof window !== 'undefined' ? window.location.hostname : undefined,
+  protocol: typeof window !== 'undefined' ? window.location.protocol : undefined,
+});
 let accessToken = null;
 const unauthorizedListeners = new Set();
 

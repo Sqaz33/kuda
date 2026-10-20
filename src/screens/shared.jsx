@@ -10,6 +10,7 @@ export const categories = [
 ];
 
 export const districts = [
+  { value: 'Весь город', label: 'Весь город' },
   { value: 'Центральный', label: 'Центр Волгограда' },
   { value: 'Ворошиловский', label: 'Ворошиловский' },
   { value: 'Дзержинский', label: 'Дзержинский' },

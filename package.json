@@ -11,9 +11,10 @@
     "ios": "expo start --ios",
     "export:web": "expo export --platform web",
     "test": "node --test tests",
+    "test:api": "node scripts/check-api.mjs",
     "mock": "node mock/server.mjs",
-    "format": "prettier --write \"{App.jsx,index.js,src/**/*.{js,jsx},mock/**/*.mjs,tests/**/*.mjs}\"",
-    "format:check": "prettier --check \"{App.jsx,index.js,src/**/*.{js,jsx},mock/**/*.mjs,tests/**/*.mjs}\""
+    "format": "prettier --write \"{App.jsx,index.js,src/**/*.{js,jsx},mock/**/*.mjs,tests/**/*.mjs,scripts/**/*.mjs}\"",
+    "format:check": "prettier --check \"{App.jsx,index.js,src/**/*.{js,jsx},mock/**/*.mjs,tests/**/*.mjs,scripts/**/*.mjs}\""
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
