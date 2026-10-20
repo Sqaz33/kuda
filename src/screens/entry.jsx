@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Body, Button, Card, Eyebrow, Field, Notice, Screen, Separator } from '../ui';
 import { colors, common, fonts } from '../theme';
+import { previewAccess } from '../room-state';
 import {
   areaSummary,
   AvatarStack,
@@ -85,7 +86,7 @@ export function HomeScreen({ user, rooms, onCreate, onJoin, onAuth, onOpen }) {
               <View>
                 <Text style={common.body}>{meeting(room.constraints)}</Text>
                 <Text style={common.small}>
-                  КОД {room.code} · {room.members.length} УЧАСТНИКОВ
+                  {room.code ? `КОД ${room.code}` : 'КОМНАТА'} · {room.members.length} УЧАСТНИКОВ
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
@@ -98,25 +99,15 @@ export function HomeScreen({ user, rooms, onCreate, onJoin, onAuth, onOpen }) {
   );
 }
 
-export function AuthScreen({ onBack, onEmail, onMini, mini, busy, user }) {
-  const [mode, setMode] = useState(user && !user.email ? 'register' : 'login');
+export function AuthScreen({ onBack, onGuest, onMini, mini, busy, user }) {
   const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const valid =
-    /.+@.+\..+/.test(email.trim()) &&
-    password.length >= 8 &&
-    (mode === 'login' || name.trim().length >= 2);
+  const valid = name.trim().length >= 1 && name.trim().length <= 80;
 
   return (
     <Screen
       footer={
-        <Button
-          disabled={!valid}
-          loading={busy}
-          onPress={() => onEmail(mode, email.trim().toLowerCase(), password, name.trim())}
-        >
-          {mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+        <Button disabled={!valid} loading={busy} onPress={() => onGuest(name.trim())}>
+          Продолжить как гость
         </Button>
       }
     >
@@ -124,64 +115,34 @@ export function AuthScreen({ onBack, onEmail, onMini, mini, busy, user }) {
       <BackLink onPress={onBack} />
       <PageIntro
         label="01 / АККАУНТ"
-        title={mode === 'login' ? 'С возвращением.' : 'Будем знакомы.'}
-        description={
-          mode === 'login'
-            ? 'Войдите по почте, чтобы вернуться к своим комнатам.'
-            : user && !user.email
-              ? 'Привяжите почту — комнаты и голоса сохранятся.'
-              : 'Вход по почте позволит вернуться к своим комнатам на другом устройстве.'
-        }
+        title="Будем знакомы."
+        description="Гостевой профиль сохраняется на этом устройстве. Повторный вход под тем же именем создаёт новый профиль."
       />
       <View style={styles.authFields}>
-        {mode === 'register' ? (
-          <Field
-            label="Ваше имя"
-            value={name}
-            onChangeText={setName}
-            placeholder="Имя"
-            autoCapitalize="words"
-          />
-        ) : null}
         <Field
-          label="Электронная почта"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
+          label="Ваше имя"
+          value={name}
+          onChangeText={setName}
+          placeholder="Имя"
+          autoCapitalize="words"
+          maxLength={80}
         />
-        <Field
-          label="Пароль"
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Не меньше 8 символов"
-          secureTextEntry
-        />
-        <Button variant="quiet" onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
-          {mode === 'login' ? 'Создать аккаунт' : 'Уже есть аккаунт? Войти'}
-        </Button>
       </View>
       <Separator />
       <Eyebrow>В МЕССЕНДЖЕРЕ</Eyebrow>
       <Body muted style={styles.miniHint}>
-        Откройте Куда внутри Telegram или MAX для входа по данным мини-приложения.
+        Для входа через Telegram откройте Куда внутри Telegram Mini App. Вход по почте и MAX пока
+        недоступен.
       </Body>
-      <Button
-        variant="secondary"
-        disabled={mini?.provider !== 'telegram'}
-        onPress={() => onMini('telegram')}
-      >
-        Войти через Telegram
-      </Button>
-      <Button
-        variant="secondary"
-        disabled={mini?.provider !== 'max'}
-        onPress={() => onMini('max')}
-        style={styles.spacedButton}
-      >
-        Войти через MAX
-      </Button>
+      {mini?.provider === 'telegram' ? (
+        <Button
+          variant="secondary"
+          disabled={mini?.provider !== 'telegram'}
+          onPress={() => onMini('telegram')}
+        >
+          Войти через Telegram
+        </Button>
+      ) : null}
     </Screen>
   );
 }
@@ -202,8 +163,8 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
         title="Ваш профиль."
         description={
           user.method === 'guest'
-            ? 'Гостевой профиль сохранён на этом устройстве. Привяжите почту, чтобы открывать комнаты на других устройствах.'
-            : 'Комнаты и голоса доступны на устройствах, где вы вошли в аккаунт.'
+            ? 'Гостевой профиль сохранён на этом устройстве. Ссылка на комнату не переносит ваши голоса на другое устройство.'
+            : 'Telegram узнаёт ваш профиль при следующем входе в мини-приложение.'
         }
       />
       <Card style={styles.accountCard}>
@@ -213,23 +174,21 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
           {user.email || (user.method === 'guest' ? 'Гостевой профиль' : user.method.toUpperCase())}
         </Body>
       </Card>
-      {!user.email ? (
-        <Button onPress={onAuth} style={styles.spacedButton}>
-          Привязать почту
-        </Button>
-      ) : null}
     </Screen>
   );
 }
 
-export function JoinCodeScreen({ onBack, onLookup, busy }) {
+export function JoinCodeScreen({ user, onBack, onLookup, busy }) {
   const [code, setCode] = useState('');
+  const [name, setName] = useState('');
   const [focused, setFocused] = useState(false);
+  const ready =
+    code.length === 4 && (user || (name.trim().length >= 1 && name.trim().length <= 80));
   return (
     <Screen
       footer={
         <>
-          <Button disabled={code.length !== 4} loading={busy} onPress={() => onLookup(code)}>
+          <Button disabled={!ready} loading={busy} onPress={() => onLookup(code, name.trim())}>
             Найти комнату
           </Button>
           <Text style={styles.footerHint}>ЕСТЬ ССЫЛКА? ОТКРОЙТЕ ЕЁ ИЗ СООБЩЕНИЯ</Text>
@@ -246,6 +205,15 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
         description="Попросите четырёхзначный код у создателя комнаты."
       />
       <View style={styles.codeSection}>
+        {!user ? (
+          <Field
+            label="Ваше имя"
+            value={name}
+            onChangeText={setName}
+            maxLength={80}
+            hint="Поиск по коду доступен после гостевого входа. Имя сохранится для комнаты."
+          />
+        ) : null}
         <Eyebrow>КОД КОМНАТЫ</Eyebrow>
         <View style={[styles.codeInput, focused && styles.codeInputFocused]}>
           <TextInput
@@ -253,7 +221,7 @@ export function JoinCodeScreen({ onBack, onLookup, busy }) {
             onChangeText={(text) => setCode(text.replace(/\D/g, '').slice(0, 4))}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
-            onSubmitEditing={() => code.length === 4 && !busy && onLookup(code)}
+            onSubmitEditing={() => ready && !busy && onLookup(code, name.trim())}
             keyboardType="number-pad"
             returnKeyType="done"
             style={styles.codeCapture}
@@ -286,8 +254,7 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
   const [name, setName] = useState(user?.name || '');
   const [askName, setAskName] = useState(false);
   const room = preview.room;
-  const blocked = ['cancelled', 'expired', 'full', 'invalid', 'removed'].includes(preview.access);
-  const selected = preview.access === 'selected';
+  const { blocked, selected, member } = previewAccess(preview, user);
 
   return (
     <Screen
@@ -314,7 +281,7 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
               loading={busy}
               onPress={() => (user ? onJoin(user.name) : setAskName(true))}
             >
-              Присоединиться
+              {member ? 'Вернуться в комнату' : 'Присоединиться'}
             </Button>
             <Text style={styles.footerHint}>НИЧЕГО УСТАНАВЛИВАТЬ НЕ НУЖНО</Text>
           </>
@@ -323,7 +290,7 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
     >
       <Header room={room} onHome={onBack} />
       <PageIntro
-        label={`ПРИГЛАШЕНИЕ В КОМНАТУ #${room.code}`}
+        label={room.code ? `ПРИГЛАШЕНИЕ В КОМНАТУ #${room.code}` : 'ПРИГЛАШЕНИЕ В КОМНАТУ'}
         titleStyle={{ maxWidth: 255 }}
         descriptionStyle={{ marginTop: 8 }}
         title={
@@ -381,10 +348,11 @@ export function PreviewScreen({ preview, user, onBack, onJoin, busy, fromCode })
               value={name}
               onChangeText={setName}
               placeholder="Имя для компании"
+              maxLength={80}
               autoFocus
             />
             <Button
-              disabled={name.trim().length < 2}
+              disabled={name.trim().length < 1 || name.trim().length > 80}
               loading={busy}
               onPress={() => onJoin(name.trim())}
             >

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { api, hasToken, loadToken, saveToken } from './src/api';
+import { api, hasToken, loadToken, saveToken, subscribeUnauthorized } from './src/api';
+import { acceptsRoom, roomScreen } from './src/room-state';
 import { inviteFromUrl, shareInvite } from './src/links';
 import { detectMiniApp } from './src/miniapps';
 import { colors, fonts } from './src/theme';
@@ -22,17 +23,6 @@ import {
   UnavailableScreen,
   WaitingScreen,
 } from './src/screens';
-
-function roomScreen(room) {
-  if (room.status === 'waiting') return 'lobby';
-  if (room.status === 'swiping')
-    return room.selfFinished || room.candidates.every((venue) => room.ownVotes?.[venue.id])
-      ? 'waiting'
-      : 'deck';
-  if (room.status === 'deciding') return 'matches';
-  if (room.status === 'selected' || room.status === 'completed') return 'result';
-  return 'unavailable';
-}
 
 export default function App() {
   const [loaded] = useFonts({
@@ -56,11 +46,18 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [offline, setOffline] = useState(false);
+  const roomRef = useRef(null);
+  const busyRef = useRef(false);
 
   function showError(cause) {
-    setError(cause?.message || 'Что-то пошло не так. Попробуй ещё раз.');
+    setError(
+      (cause?.message || 'Что-то пошло не так. Попробуй ещё раз.') +
+        (cause?.retryAfter ? ` Повторите через ${cause.retryAfter} сек.` : ''),
+    );
   }
   async function run(action) {
+    if (busyRef.current) return null;
+    busyRef.current = true;
     setBusy(true);
     setError('');
     try {
@@ -69,10 +66,13 @@ export default function App() {
       showError(cause);
       return null;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
   function applyRoom(next, keepDetails = false) {
+    if (!acceptsRoom(roomRef.current, next)) return;
+    roomRef.current = next;
     setRoom(next);
     if (!keepDetails) setScreen(roomScreen(next));
   }
@@ -102,11 +102,32 @@ export default function App() {
   }
   async function ensureGuest(name) {
     if (user) return user;
+    if (hasToken()) {
+      const existing = await api.me();
+      setUser(existing);
+      return existing;
+    }
     const auth = await api.guest(name);
     await saveToken(auth.token);
     setUser(auth.user);
     return auth.user;
   }
+
+  useEffect(
+    () =>
+      subscribeUnauthorized(() => {
+        roomRef.current = null;
+        setRoom(null);
+        setRooms([]);
+        setUser(null);
+        setOffline(false);
+        setError(
+          'Сессия закончилась. Войдите снова. Гостевой профиль с тем же именем будет новым пользователем.',
+        );
+        setScreen('auth');
+      }),
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -116,20 +137,26 @@ export default function App() {
         const detected = await detectMiniApp();
         if (!mounted) return;
         setMini(detected);
-        if (detected) {
+        let restored = false;
+        if (hasToken()) {
+          try {
+            const me = await api.me();
+            restored = true;
+            if (mounted) setUser(me);
+          } catch (cause) {
+            if (cause.status !== 401) throw cause;
+          }
+        }
+        if (!restored && detected?.provider === 'telegram') {
           try {
             const auth = await api.miniApp(detected.provider, detected.initData);
             await saveToken(auth.token);
-            if (mounted) setUser(auth.user);
+            if (mounted) {
+              setUser(auth.user);
+              setError('');
+            }
           } catch (cause) {
             if (mounted) showError(cause);
-          }
-        } else if (hasToken()) {
-          try {
-            const me = await api.me();
-            if (mounted) setUser(me);
-          } catch {
-            await saveToken(null);
           }
         }
         const initial = await Linking.getInitialURL();
@@ -165,25 +192,33 @@ export default function App() {
     if (!room?.id || !['lobby', 'deck', 'waiting', 'matches', 'result', 'details'].includes(screen))
       return;
     let active = true;
-    const id = setInterval(async () => {
+    let timer;
+    async function poll() {
       try {
         const next = await api.room(room.id);
         if (active) {
           setOffline(false);
-          applyRoom(next, screen === 'details');
+          applyRoom(
+            next,
+            screen === 'details' ||
+              (screen === 'matches' && next.winner?.availability === 'withdrawn'),
+          );
         }
       } catch (cause) {
         if (active) {
-          if (cause.status === 403) {
+          if (cause.status === 403 || cause.status === 404) {
             setError('Вы больше не участник этой комнаты.');
             setScreen('unavailable');
-          } else setOffline(true);
+          } else if (cause.status !== 401 && cause.code !== 'SESSION_CHANGED') setOffline(true);
         }
+      } finally {
+        if (active) timer = setTimeout(poll, 4000);
       }
-    }, 4000);
+    }
+    timer = setTimeout(poll, 4000);
     return () => {
       active = false;
-      clearInterval(id);
+      clearTimeout(timer);
     };
   }, [room?.id, screen]);
   useEffect(() => {
@@ -191,14 +226,13 @@ export default function App() {
       void api
         .track('fallback_shown', {
           roomId: room.id,
-          mode: room.matchMode,
-          incomplete: room.incomplete,
         })
         .catch(() => {});
     }
   }, [room?.id, room?.status, room?.matchMode]);
 
   async function goHome() {
+    roomRef.current = null;
     setRoom(null);
     setPreview(null);
     setError('');
@@ -210,9 +244,9 @@ export default function App() {
       applyRoom(await api.room(id));
     });
   }
-  async function authenticateEmail(mode, email, password, name) {
+  async function authenticateGuest(name) {
     await run(async () => {
-      const auth = await api.email(mode, email, password, name);
+      const auth = await api.guest(name);
       await saveToken(auth.token);
       setUser(auth.user);
       await goHome();
@@ -234,6 +268,7 @@ export default function App() {
       /* Local sign-out still proceeds. */
     }
     await saveToken(null);
+    roomRef.current = null;
     setUser(null);
     setRooms([]);
     setRoom(null);
@@ -244,11 +279,11 @@ export default function App() {
       await ensureGuest(name);
       const created = await api.createRoom(constraints);
       applyRoom(created);
-      void api.track('room_created', { roomId: created.id }).catch(() => {});
     });
   }
-  async function lookupCode(code) {
+  async function lookupCode(code, name) {
     await run(async () => {
+      await ensureGuest(name);
       const found = await api.roomByCode(code);
       setPreview(found);
       setPreviewOrigin('join');
@@ -260,13 +295,11 @@ export default function App() {
       await ensureGuest(name);
       const joined = await api.join(preview.token);
       applyRoom(joined);
-      void api.track('member_joined', { roomId: joined.id }).catch(() => {});
     });
   }
   async function startRoom() {
     await run(async () => {
       applyRoom(await api.start(room.id));
-      void api.track('voting_started', { roomId: room.id }).catch(() => {});
     });
   }
   async function rotateInvite() {
@@ -305,13 +338,11 @@ export default function App() {
     await run(async () => {
       const next = await api.closeVoting(room.id);
       applyRoom(next);
-      void api.track('voting_finished', { roomId: room.id, mode: next.matchMode }).catch(() => {});
     });
   }
   async function choose(venueId) {
     await run(async () => {
       applyRoom(await api.choose(room.id, venueId));
-      void api.track('winner_selected', { roomId: room.id, venueId }).catch(() => {});
     });
   }
   async function note(value) {
@@ -340,7 +371,11 @@ export default function App() {
   }
   function openAction(kind, url) {
     void api
-      .track('booking_action', { roomId: room.id, venueId: room.winner.id, kind })
+      .track('booking_action', {
+        roomId: room.id,
+        venueId: room.winner.id,
+        action: kind === 'phone' ? 'call' : kind,
+      })
       .catch(() => {});
     Linking.openURL(url).catch(showError);
   }
@@ -373,7 +408,7 @@ export default function App() {
       <AuthScreen
         user={user}
         onBack={goHome}
-        onEmail={authenticateEmail}
+        onGuest={authenticateGuest}
         onMini={authenticateMini}
         mini={mini}
         busy={busy}
@@ -391,7 +426,7 @@ export default function App() {
   else if (screen === 'create')
     content = <CreateScreen user={user} onBack={goHome} onCreate={createRoom} busy={busy} />;
   else if (screen === 'join')
-    content = <JoinCodeScreen onBack={goHome} onLookup={lookupCode} busy={busy} />;
+    content = <JoinCodeScreen user={user} onBack={goHome} onLookup={lookupCode} busy={busy} />;
   else if (screen === 'preview' && preview)
     content = (
       <PreviewScreen
@@ -463,13 +498,15 @@ export default function App() {
         onNote={note}
         onDetail={details}
         onAction={openAction}
+        onReplace={() => setScreen('matches')}
+        onCancel={cancelRoom}
         pending={busy}
       />
     );
   else if (screen === 'details' && venue)
     content = (
       <DetailsScreen
-        venue={venue}
+        venue={room?.candidates.find((item) => item.id === venue.id) || venue}
         room={room}
         onBack={() => setScreen(room ? roomScreen(room) : returnTo)}
         onVote={vote}

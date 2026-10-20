@@ -3,6 +3,7 @@ import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Body, Button, Card, Eyebrow, Notice, Screen, Separator } from '../ui';
 import { colors, common, fonts } from '../theme';
 import { inviteLink } from '../links';
+import { canExtend, canVote, resultExplanation, roundProgress } from '../room-state';
 import {
   areaSummary,
   AvatarStack,
@@ -20,11 +21,7 @@ import {
 } from './shared';
 
 function VenueMeta({ venue }) {
-  return (
-    <Text style={styles.venueMeta}>
-      {venue.category === 'bar' ? 'КОКТЕЙЛЬНЫЙ БАР' : categoryLabel(venue.category).toUpperCase()}
-    </Text>
-  );
+  return <Text style={styles.venueMeta}>{categoryLabel(venue.category).toUpperCase()}</Text>;
 }
 
 function EndRoom({ onCancel }) {
@@ -87,19 +84,27 @@ function Overlay({ title, children, onClose, style }) {
   );
 }
 
-function ReviewOverlay({ onClose }) {
+function ReviewOverlay({ venue, onClose }) {
   return (
     <Overlay title="Отзывы и фото" onClose={onClose} style={styles.reviewsOverlay}>
       <View>
-        <Text style={styles.modalRating}>★ 4,9</Text>
-        <Body muted>420 отзывов в карточке источника</Body>
+        <Body muted>
+          Отзывы и фотографии доступны на странице источника, если он указан в каталоге.
+        </Body>
       </View>
       <Card style={styles.reviewPlaceholder}>
-        <Eyebrow style={{ color: colors.red }}>ПРИМЕР ПРОТОТИПА</Eyebrow>
+        <Eyebrow>ИСТОЧНИК ДАННЫХ</Eyebrow>
         <Body style={{ marginTop: 20 }}>
-          Фотографии и отзывы будут открываться здесь после подключения источника данных.
+          {venue?.sourceUrl
+            ? 'Откройте исходную карточку заведения.'
+            : 'Источник отзывов пока не указан.'}
         </Body>
       </Card>
+      {venue?.sourceUrl ? (
+        <Button variant="secondary" onPress={() => Linking.openURL(venue.sourceUrl)}>
+          Открыть источник ↗
+        </Button>
+      ) : null}
       <Button onPress={onClose}>Назад к месту</Button>
     </Overlay>
   );
@@ -185,8 +190,21 @@ export function LobbyScreen({
         />
         <Card style={styles.codeCard}>
           <Eyebrow>КОД КОМНАТЫ</Eyebrow>
-          <Text style={styles.code}>{room.code}</Text>
-          <Text style={styles.codeCaption}>Отправьте ссылку или продиктуйте код</Text>
+          <Text style={styles.code}>
+            {room.code && (!room.codeExpiresAt || Date.parse(room.codeExpiresAt) > Date.now())
+              ? room.code
+              : '—'}
+          </Text>
+          <Text style={styles.codeCaption}>
+            {room.codeExpiresAt && Date.parse(room.codeExpiresAt) <= Date.now()
+              ? 'Срок кода истёк. Ссылка приглашения продолжает работать.'
+              : 'Отправьте ссылку или продиктуйте код'}
+          </Text>
+          {host ? (
+            <Button variant="quiet" disabled={busy} onPress={onRotate}>
+              Обновить приглашение
+            </Button>
+          ) : null}
         </Card>
         <View style={styles.participantSection}>
           <Eyebrow>
@@ -294,9 +312,7 @@ export function DeckScreen({
   onCancel,
   pending,
 }) {
-  const votes = room.ownVotes || {};
-  const current = room.candidates.find((candidate) => !votes[candidate.id]);
-  const done = Object.keys(votes).length;
+  const { current, done, total, likes, canFinish } = roundProgress(room);
   const [showVotes, setShowVotes] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
   if (!current)
@@ -318,7 +334,7 @@ export function DeckScreen({
               left={
                 <Button
                   variant="secondary"
-                  disabled={pending}
+                  disabled={pending || !canVote(room, current.id)}
                   onPress={() => onVote(current.id, 'dislike')}
                   style={styles.flexButton}
                 >
@@ -328,6 +344,7 @@ export function DeckScreen({
               right={
                 <Button
                   loading={pending}
+                  disabled={!canVote(room, current.id)}
                   onPress={() => onVote(current.id, 'like')}
                   style={styles.flexButton}
                 >
@@ -337,17 +354,14 @@ export function DeckScreen({
             />
             <View style={styles.deckFooterLinks}>
               <Pressable onPress={() => setShowVotes(true)} accessibilityRole="button">
-                <Text style={styles.deckFooterText}>
-                  ПОСМОТРЕТЬ СОВПАДЕНИЯ:{' '}
-                  {Object.values(votes).filter((value) => value === 'like').length}
-                </Text>
+                <Text style={styles.deckFooterText}>ПОСМОТРЕТЬ СОВПАДЕНИЯ: {likes}</Text>
               </Pressable>
               <Pressable
                 onPress={onFinishEarly}
-                disabled={done < 10 || pending}
+                disabled={!canFinish || pending}
                 accessibilityRole="button"
               >
-                <Text style={[styles.deckFooterText, done < 10 && { color: colors.secondary }]}>
+                <Text style={[styles.deckFooterText, !canFinish && { color: colors.secondary }]}>
                   ЗАВЕРШИТЬ ГОЛОСОВАНИЕ
                 </Text>
               </Pressable>
@@ -357,28 +371,24 @@ export function DeckScreen({
       >
         <Header
           room={room}
-          center={`${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${room.candidates.length}`}
+          center={`${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${total}`}
           onExit={() => setConfirmExit(true)}
         />
         <View style={styles.deckPhoto}>
-          <VenueImage venue={current} height={378} badge="★ 4,9　·　420 ОТЗЫВОВ" />
+          <VenueImage venue={current} height={378} />
         </View>
-        <Eyebrow style={styles.deckCategory}>
-          {categoryLabel(current.category)}
-          {current.category === 'bar' ? ' · коктейли' : ''}
-        </Eyebrow>
+        <Eyebrow style={styles.deckCategory}>{categoryLabel(current.category)}</Eyebrow>
         <Text style={styles.deckVenueName}>{current.name}</Text>
         <View style={styles.deckAddress}>
           <Body muted>{current.address}</Body>
-          <Text style={styles.walk}>15 мин пешком · 1,2 км</Text>
         </View>
         <View style={styles.deckFact}>
-          <Eyebrow style={{ color: colors.green }}>●　ОТКРЫТО ДО 04:00</Eyebrow>
-          <Eyebrow>≈ {current.priceHint?.replace('Ориентир ', '') || '2 000 ₽/ЧЕЛ.'}</Eyebrow>
+          <Eyebrow>{current.hoursLabel || 'Часы уточняются'}</Eyebrow>
+          <Eyebrow>{current.priceHint || 'Цена уточняется'}</Eyebrow>
         </View>
         <View style={styles.deckFact}>
           <Eyebrow>КУХНЯ</Eyebrow>
-          <Text style={styles.factValue}>{current.cuisine || 'Авторская кухня'}</Text>
+          <Text style={styles.factValue}>{current.cuisine || 'Кухня уточняется'}</Text>
         </View>
         <View style={styles.deckFact}>
           <Eyebrow>ФОРМАТ</Eyebrow>
@@ -398,8 +408,8 @@ export function DeckScreen({
       {showVotes ? (
         <Overlay title="Ваш выбор" onClose={() => setShowVotes(false)}>
           <Body muted>
-            Отмечено «подходит»: {Object.values(votes).filter((value) => value === 'like').length}.
-            Общие совпадения появятся после завершения голосования.
+            Отмечено «подходит» в этом раунде: {likes}. Общие совпадения появятся после завершения
+            голосования.
           </Body>
           <Button variant="secondary" onPress={() => setShowVotes(false)}>
             К карточкам
@@ -463,10 +473,15 @@ export function WaitingScreen({ room, user, onBack, onFinish, onCancel }) {
 }
 
 export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend, onCancel }) {
-  const matches = (room.matches || []).slice(0, room.matchMode === 'unanimous' ? 5 : 3);
+  const matches = (room.matches || []).filter((match) => match.venue.availability !== 'withdrawn');
   const host = isHost(room, user);
   const unanimous = room.matchMode === 'unanimous';
-  const [selected, setSelected] = useState(unanimous ? matches[0]?.venue.id : null);
+  const [selectedId, setSelected] = useState(null);
+  const selected = matches.some((match) => match.venue.id === selectedId)
+    ? selectedId
+    : unanimous
+      ? matches[0]?.venue.id
+      : null;
   return (
     <Screen
       footer={
@@ -498,24 +513,32 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
         title={
           unanimous
             ? 'Есть совпадение.'
-            : matches.length
-              ? 'Почти сошлись.'
-              : 'Пока без совпадений.'
+            : matches.length && room.matchMode === 'host_choice'
+              ? 'Решение за создателем.'
+              : matches.length
+                ? 'Почти сошлись.'
+                : 'Пока без совпадений.'
         }
         description={
           unanimous
             ? host
-              ? 'Одно место понравилось всем. Вы создатель — подтвердите его для компании.'
-              : 'Одно место понравилось всем. Создатель подтвердит его для компании.'
+              ? 'Есть совпадения среди завершивших. Вы создатель — подтвердите место для компании.'
+              : 'Есть совпадения среди завершивших. Создатель подтвердит место для компании.'
             : matches.length
               ? host
                 ? selected
                   ? 'Место выделено. Подтвердите выбор для всей компании.'
-                  : 'Выберите одно из трёх мест, затем подтвердите решение.'
-                : 'Три места получили поддержку. Создатель выберет одно для всей компании.'
+                  : `Выберите одно из ${matches.length} мест, затем подтвердите решение.`
+                : 'Создатель выберет место из предложенных вариантов.'
               : 'Ни одно место не набрало достаточно голосов.'
         }
       />
+      <Notice
+        title={room.matchMode === 'host_choice' ? 'ВЫБОР ОРГАНИЗАТОРА' : 'КАК ПОЛУЧЕН РЕЗУЛЬТАТ'}
+        tone={room.incomplete ? 'warning' : 'neutral'}
+      >
+        {resultExplanation(room)}
+      </Notice>
       {!unanimous && matches.length ? (
         <View style={styles.majorityNotice}>
           <Notice
@@ -530,8 +553,8 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
             {selected && host
               ? 'После подтверждения все увидят итог.'
               : !host
-                ? 'Создатель сравнивает три варианта.'
-                : `${room.incomplete ? 'Не все участники успели ответить. ' : ''}Три места получили поддержку компании.`}
+                ? 'Создатель сравнивает предложенные варианты.'
+                : 'Сравните поддержку каждого варианта и подтвердите одно место.'}
           </Notice>
         </View>
       ) : null}
@@ -569,21 +592,42 @@ export function MatchesScreen({ room, user, onChoose, onBack, pending, onExtend,
           </Pressable>
         ))}
       </View>
-      {!matches.length && host ? (
-        <Button onPress={onExtend} style={styles.extraAction}>
+      {canExtend(room) && host ? (
+        <Button onPress={onExtend} loading={pending} style={styles.extraAction}>
           Добавить кандидатов
         </Button>
+      ) : null}
+      {!matches.length && host ? (
+        <>
+          {(room.extensionCount || 0) >= 1 ? (
+            <Body muted>
+              Дополнительный раунд уже использован. Можно создать новую встречу с другими условиями.
+            </Body>
+          ) : null}
+          <EndRoom onCancel={onCancel} />
+        </>
       ) : null}
     </Screen>
   );
 }
 
-export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, pending }) {
+export function ResultScreen({
+  room,
+  user,
+  onBack,
+  onNote,
+  onDetail,
+  onAction,
+  onReplace,
+  onCancel,
+  pending,
+}) {
   const [showContact, setShowContact] = useState(false);
   const [showReviews, setShowReviews] = useState(false);
   const venue = room.winner;
   if (!venue) return <UnavailableScreen reason="Итог встречи ещё загружается." onHome={onBack} />;
   const mapUrl = venue.mapUrl || `https://maps.google.com/?q=${encodeURIComponent(venue.address)}`;
+  const withdrawn = venue.availability === 'withdrawn';
   return (
     <>
       <Screen
@@ -614,12 +658,16 @@ export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, p
           descriptionStyle={{ marginTop: 15 }}
         />
         <View style={styles.resultVenue}>
+          {withdrawn ? (
+            <Notice title="ЗАВЕДЕНИЕ НЕДОСТУПНО" tone="warning">
+              Источник подтвердил закрытие. Прежняя отметка брони не гарантирует доступность места.
+            </Notice>
+          ) : null}
           <Pressable onPress={() => setShowReviews(true)} accessibilityRole="button">
-            <VenueImage venue={venue} height={281} badge="★ 4,9　·　420 ОТЗЫВОВ" />
+            <VenueImage venue={venue} height={281} />
           </Pressable>
           <Card style={styles.resultInfo}>
             <Text style={styles.address}>{venue.address.toUpperCase()}</Text>
-            <Eyebrow style={{ marginTop: 18 }}>15 МИН ПЕШКОМ ОТ ТОЧКИ ВСТРЕЧИ</Eyebrow>
             <Separator />
             <Text
               style={[
@@ -639,7 +687,13 @@ export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, p
         <View style={{ marginTop: 6 }}>
           <MapPreview onPress={() => onAction('map', mapUrl)} />
         </View>
-        {isHost(room, user) ? (
+        {isHost(room, user) && withdrawn ? (
+          room.matches.some((match) => match.venue.availability !== 'withdrawn') ? (
+            <Button onPress={onReplace}>Выбрать другое место</Button>
+          ) : (
+            <EndRoom onCancel={onCancel} />
+          )
+        ) : isHost(room, user) && !room.bookingNote ? (
           <View style={styles.booking}>
             <Eyebrow>ЧТО С БРОНЬЮ?</Eyebrow>
             <Body muted style={{ marginVertical: 15 }}>
@@ -672,16 +726,15 @@ export function ResultScreen({ room, user, onBack, onNote, onDetail, onAction, p
           </Button>
         </Overlay>
       ) : null}
-      {showReviews ? <ReviewOverlay onClose={() => setShowReviews(false)} /> : null}
+      {showReviews ? <ReviewOverlay venue={venue} onClose={() => setShowReviews(false)} /> : null}
     </>
   );
 }
 
 export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onReport, pending }) {
   const [showReviews, setShowReviews] = useState(false);
-  const voting = room?.status === 'swiping';
-  const votes = room?.ownVotes || {};
-  const done = Object.keys(votes).length;
+  const voting = canVote(room, venue.id);
+  const { done, total, likes, canFinish } = roundProgress(room);
   return (
     <>
       <Screen
@@ -710,12 +763,9 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
                 }
               />
               <View style={styles.deckFooterLinks}>
-                <Text style={styles.deckFooterText}>
-                  ПОСМОТРЕТЬ СОВПАДЕНИЯ:{' '}
-                  {Object.values(votes).filter((value) => value === 'like').length}
-                </Text>
-                <Pressable disabled={done < 10} onPress={onFinishEarly}>
-                  <Text style={[styles.deckFooterText, done < 10 && { color: colors.secondary }]}>
+                <Text style={styles.deckFooterText}>ПОСМОТРЕТЬ СОВПАДЕНИЯ: {likes}</Text>
+                <Pressable disabled={!canFinish || pending} onPress={onFinishEarly}>
+                  <Text style={[styles.deckFooterText, !canFinish && { color: colors.secondary }]}>
                     ЗАВЕРШИТЬ ГОЛОСОВАНИЕ
                   </Text>
                 </Pressable>
@@ -732,7 +782,7 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
           room={room}
           center={
             voting
-              ? `${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${room.candidates.length}`
+              ? `${Math.max(0, Math.floor((Date.parse(room.deadlineAt) - Date.now()) / 60000))} МИН ДО КОНЦА\nМЕСТО ${String(done + 1).padStart(2, '0')} / ${total}`
               : 'О МЕСТЕ'
           }
           onExit={onBack}
@@ -752,15 +802,13 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
         <Eyebrow style={styles.detailsLabel}>О МЕСТЕ</Eyebrow>
         <Card style={styles.aboutCard}>
           <Text style={styles.aboutText}>
-            {venue.id === 'venue-1'
-              ? 'Коктейльный бар с авторскими напитками и тапас.'
-              : `${categoryLabel(venue.category)} для компании. ${venue.cuisine || 'Кухня уточняется'}.`}
+            {categoryLabel(venue.category)}. {venue.cuisine || 'Кухня уточняется'}.
           </Text>
           <Separator />
           <View style={styles.aboutTags}>
             <Eyebrow>{categoryLabel(venue.category).toUpperCase()}</Eyebrow>
             <Eyebrow>{venue.tags?.[0]?.toUpperCase()}</Eyebrow>
-            <Eyebrow>ДО 04:00</Eyebrow>
+            <Eyebrow>{venue.hoursLabel || 'Часы уточняются'}</Eyebrow>
           </View>
         </Card>
         <Eyebrow style={styles.detailsLabel}>ОТЗЫВЫ И ФОТО</Eyebrow>
@@ -769,8 +817,7 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
           accessibilityRole="button"
           style={styles.reviewCard}
         >
-          <Text style={styles.reviewRating}>★ 4,9</Text>
-          <Text style={styles.reviewLink}>420 ОТЗЫВОВ · СМОТРЕТЬ ФОТОГРАФИИ ↗</Text>
+          <Text style={styles.reviewLink}>ОТКРЫТЬ ИСТОЧНИК И ОТЗЫВЫ ↗</Text>
         </Pressable>
         <View style={styles.reportLinks}>
           <Pressable onPress={() => onReport(venue.id, 'closed')}>
@@ -781,7 +828,7 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
           </Pressable>
         </View>
       </Screen>
-      {showReviews ? <ReviewOverlay onClose={() => setShowReviews(false)} /> : null}
+      {showReviews ? <ReviewOverlay venue={venue} onClose={() => setShowReviews(false)} /> : null}
     </>
   );
 }

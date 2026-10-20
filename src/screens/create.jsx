@@ -41,7 +41,7 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
     return Date.parse(`${today}T19:30:00+03:00`) > Date.now() ? today : localDate(1);
   });
   const [time, setTime] = useState('19:30');
-  const [areaMode, setAreaMode] = useState('radius');
+  const [areaMode, setAreaMode] = useState('district');
   const [district, setDistrict] = useState('Центральный');
   const [pointAddress, setPointAddress] = useState('Центр Волгограда');
   const [radiusKm, setRadiusKm] = useState('3');
@@ -51,6 +51,7 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
   const [deadlineMinutes, setDeadline] = useState('15');
   const [exclusions, setExclusions] = useState('');
   const [estimate, setEstimate] = useState(null);
+  const [estimatedKey, setEstimatedKey] = useState(null);
   const [estimateError, setEstimateError] = useState('');
 
   const constraints = {
@@ -81,16 +82,23 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
     Date.parse(`${date}T${time}:00+03:00`) > Date.now();
   const valid =
     validDate &&
+    Number.isInteger(Number(budgetMax)) &&
     Number(budgetMax) >= 300 &&
+    Number(budgetMax) <= 100000 &&
+    Number.isInteger(Number(partySize)) &&
     Number(partySize) >= 2 &&
     Number(partySize) <= 12 &&
+    Number.isInteger(Number(deadlineMinutes)) &&
     Number(deadlineMinutes) >= 5 &&
     Number(deadlineMinutes) <= 120 &&
-    (areaMode === 'district' || (pointAddress.trim().length >= 3 && Number(radiusKm) > 0));
+    constraints.exclusions.length <= 10 &&
+    (areaMode === 'district' ||
+      (pointAddress.trim().length >= 3 && Number(radiusKm) >= 0.1 && Number(radiusKm) <= 50));
   const constraintsKey = JSON.stringify(constraints);
 
   useEffect(() => {
-    if (!validDate) {
+    setEstimate(null);
+    if (!valid) {
       setEstimate(null);
       return;
     }
@@ -100,6 +108,7 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
         const result = await api.estimate(constraints);
         if (active) {
           setEstimate(result);
+          setEstimatedKey(constraintsKey);
           setEstimateError('');
         }
       } catch (error) {
@@ -115,7 +124,8 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
     };
   }, [constraintsKey]);
 
-  const ready = valid && estimate?.count >= 12;
+  const ready =
+    valid && estimatedKey === constraintsKey && estimate && estimate.count >= estimate.minimum;
   const closeEditor = () => setEditing(null);
   const footer = editing ? (
     <Button onPress={closeEditor}>Сохранить</Button>
@@ -284,14 +294,19 @@ export function CreateScreen({ user, onBack, onCreate, busy }) {
           onPress={() => setEditing('party')}
         />
       </View>
-      <Text style={[styles.estimate, estimate?.count < 12 && { color: colors.red }]}>
+      <Text
+        style={[
+          styles.estimate,
+          estimate && estimate.count < estimate.minimum && { color: colors.red },
+        ]}
+      >
         {estimateError
           ? 'НЕ УДАЛОСЬ ПРОВЕРИТЬ КАТАЛОГ'
           : estimate
             ? `${estimate.count} ПОДХОДЯЩИХ МЕСТ`
             : 'ПРОВЕРЯЕМ МЕСТА…'}
       </Text>
-      {estimate?.count < 12 ? (
+      {estimate && estimate.count < estimate.minimum ? (
         <Notice title="МЕСТ ПОКА МАЛО" tone="warning">
           Расширьте район, бюджет или категории.
         </Notice>

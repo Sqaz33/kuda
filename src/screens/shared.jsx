@@ -13,7 +13,6 @@ export const districts = [
   { value: 'Центральный', label: 'Центр Волгограда' },
   { value: 'Ворошиловский', label: 'Ворошиловский' },
   { value: 'Дзержинский', label: 'Дзержинский' },
-  { value: 'Весь город', label: 'Весь город' },
 ];
 
 export const isHost = (room, user) => room?.hostId === user?.id;
@@ -55,13 +54,15 @@ export function Topline({ room, center, onAccount }) {
     <View style={styles.topline}>
       <View style={styles.topLeft}>
         <View style={styles.redDot} />
-        <Text style={styles.topText}>{room ? `КОМНАТА #${room.code}` : 'ВОЛГОГРАД'}</Text>
+        <Text style={styles.topText}>
+          {room ? (room.code ? `КОМНАТА #${room.code}` : 'КОМНАТА') : 'ВОЛГОГРАД'}
+        </Text>
       </View>
       <Text style={styles.topCenter} numberOfLines={2}>
         {center || (room ? meeting(room.constraints).toUpperCase() : 'СЕГОДНЯ · 19:30')}
       </Text>
       <Pressable onPress={onAccount} style={styles.topRight} accessibilityRole="button">
-        <Text style={styles.topRightText}>{room ? `КОД: ${room.code}` : 'КУДА ↗'}</Text>
+        <Text style={styles.topRightText}>{room ? `КОД: ${room.code || '—'}` : 'КУДА ↗'}</Text>
       </Pressable>
     </View>
   );

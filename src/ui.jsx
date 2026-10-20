@@ -81,6 +81,7 @@ export function Button({
     <Pressable
       testID={testID}
       accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -119,6 +120,7 @@ export function Field({ label, hint, error, ...props }) {
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         {...props}
+        accessibilityLabel={props.accessibilityLabel || label}
         placeholderTextColor={colors.muted}
         selectionColor={colors.red}
         style={[
