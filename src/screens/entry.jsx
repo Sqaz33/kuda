@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ImageBackground,
   Linking,
@@ -34,7 +34,17 @@ function Step({ number, title }) {
   );
 }
 
-export function HomeScreen({ user, rooms, onCreate, onJoin, onAuth, onOpen }) {
+export function HomeScreen({
+  user,
+  rooms,
+  onCreate,
+  onJoin,
+  onAuth,
+  onOpen,
+  roomsStatus,
+  roomsError,
+  onRetryRooms,
+}) {
   return (
     <Screen
       footer={
@@ -73,6 +83,24 @@ export function HomeScreen({ user, rooms, onCreate, onJoin, onAuth, onOpen }) {
         <Step number="02" title="Собрать голоса" />
         <Step number="03" title="Договориться о месте" />
       </View>
+      {user && roomsStatus === 'loading' ? (
+        <Body muted style={styles.rooms} accessibilityLiveRegion="polite">
+          Загружаем ваши комнаты…
+        </Body>
+      ) : null}
+      {user && roomsStatus === 'error' ? (
+        <View style={styles.rooms}>
+          <Notice title="НЕ УДАЛОСЬ ОБНОВИТЬ КОМНАТЫ" tone="warning">
+            {roomsError} Ранее загруженный список, если он есть, оставлен на экране.
+          </Notice>
+          <Button variant="secondary" onPress={onRetryRooms}>
+            Повторить загрузку комнат
+          </Button>
+        </View>
+      ) : null}
+      {user && roomsStatus === 'success' && !rooms.length ? (
+        <Notice title="ПОКА НЕТ КОМНАТ">Создайте встречу или присоединитесь по приглашению.</Notice>
+      ) : null}
       {rooms?.length ? (
         <View style={styles.rooms}>
           <Eyebrow>ВАШИ КОМНАТЫ</Eyebrow>
@@ -99,7 +127,7 @@ export function HomeScreen({ user, rooms, onCreate, onJoin, onAuth, onOpen }) {
   );
 }
 
-export function AuthScreen({ onBack, onGuest, onMini, mini, busy, user }) {
+export function AuthScreen({ onBack, onGuest, onMini, mini, busy, user, onTransfer }) {
   const [name, setName] = useState(user?.name || '');
   const valid = name.trim().length >= 1 && name.trim().length <= 80;
 
@@ -128,6 +156,9 @@ export function AuthScreen({ onBack, onGuest, onMini, mini, busy, user }) {
           maxLength={80}
         />
       </View>
+      <Button variant="secondary" disabled={busy} onPress={onTransfer}>
+        У меня есть код переноса
+      </Button>
       <Separator />
       <Eyebrow>В МЕССЕНДЖЕРЕ</Eyebrow>
       <Body muted style={styles.miniHint}>
@@ -147,12 +178,36 @@ export function AuthScreen({ onBack, onGuest, onMini, mini, busy, user }) {
   );
 }
 
-export function AccountScreen({ user, onBack, onLogout, onAuth }) {
+export function AccountScreen({
+  user,
+  onBack,
+  onLogout,
+  onCreateTransfer,
+  onTransfer,
+  busy,
+  error,
+}) {
+  const [ticket, setTicket] = useState(null);
+  const [now, setNow] = useState(Date.now());
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  useEffect(() => {
+    if (!ticket) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [ticket]);
+  const seconds = ticket ? Math.max(0, Math.ceil((Date.parse(ticket.expiresAt) - now) / 1000)) : 0;
+  async function createTransfer() {
+    const next = await onCreateTransfer();
+    if (next) {
+      setNow(Date.now());
+      setTicket(next);
+    }
+  }
   return (
     <Screen
       footer={
-        <Button variant="secondary" onPress={onLogout}>
-          Выйти
+        <Button variant="secondary" disabled={busy} onPress={() => setConfirmLogout(true)}>
+          Выйти из профиля
         </Button>
       }
     >
@@ -174,6 +229,140 @@ export function AccountScreen({ user, onBack, onLogout, onAuth }) {
           {user.email || (user.method === 'guest' ? 'Гостевой профиль' : user.method.toUpperCase())}
         </Body>
       </Card>
+      <View style={styles.transferSection}>
+        <Eyebrow>ПРОФИЛЬ НА ДРУГОМ УСТРОЙСТВЕ</Eyebrow>
+        <Body muted>
+          Код переносит доступ к этому же профилю, комнатам и голосам. Действует пять минут и
+          используется один раз. Не отправляйте его другим людям.
+        </Body>
+        {error ? (
+          <Notice title="НЕ УДАЛОСЬ ВЫПОЛНИТЬ ДЕЙСТВИЕ" tone="warning">
+            {error}
+          </Notice>
+        ) : null}
+        {ticket && seconds > 0 ? (
+          <Card>
+            <Eyebrow>ОДНОРАЗОВЫЙ КОД</Eyebrow>
+            <Text selectable style={styles.transferCode}>
+              {ticket.transferCode}
+            </Text>
+            <Body muted>Скопируйте на другом устройстве в «У меня есть код переноса».</Body>
+            <Body muted>
+              Истекает через {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+            </Body>
+          </Card>
+        ) : ticket ? (
+          <Notice title="СРОК КОДА ИСТЁК" tone="warning">
+            Получите новый код на этом устройстве.
+          </Notice>
+        ) : null}
+        <Button variant="secondary" loading={busy} onPress={createTransfer}>
+          {ticket ? 'Создать новый код переноса' : 'Создать код переноса'}
+        </Button>
+        <Button variant="quiet" disabled={busy} onPress={onTransfer}>
+          Открыть другой профиль по коду
+        </Button>
+        {confirmLogout ? (
+          <Notice title="ВЫЙТИ ИЗ ПРОФИЛЯ?" tone="warning">
+            {user.method === 'guest'
+              ? 'Повторное имя не восстановит этот профиль. Сначала перенесите его на другое устройство, иначе доступ к комнатам и голосам может быть потерян. Код из этой сессии перестаёт работать после выхода.'
+              : 'Текущая сессия будет завершена.'}
+          </Notice>
+        ) : null}
+        {confirmLogout ? (
+          <>
+            <Button variant="danger" loading={busy} onPress={onLogout}>
+              Подтверждаю выход
+            </Button>
+            <Button variant="quiet" disabled={busy} onPress={() => setConfirmLogout(false)}>
+              Остаться в профиле
+            </Button>
+          </>
+        ) : null}
+      </View>
+    </Screen>
+  );
+}
+
+export function TransferScreen({ user, onBack, onExchange, busy, error }) {
+  const [code, setCode] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const valid = code.trim().length > 0 && code.trim().length <= 100;
+  return (
+    <Screen
+      footer={
+        <Button
+          loading={busy}
+          disabled={!valid || Boolean(user && !confirmed)}
+          onPress={() => onExchange(code.trim())}
+        >
+          Открыть профиль
+        </Button>
+      }
+    >
+      <Header center="ПЕРЕНОС ПРОФИЛЯ" />
+      <BackLink onPress={onBack} />
+      <PageIntro
+        label="АККАУНТ / ДРУГОЕ УСТРОЙСТВО"
+        title="Продолжить в своём профиле."
+        description="На устройстве, где вы уже вошли, откройте профиль и создайте код переноса. Код одноразовый и действует пять минут."
+      />
+      <View style={styles.transferSection}>
+        <Field
+          label="Код переноса"
+          value={code}
+          onChangeText={setCode}
+          maxLength={100}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          hint="Это не четырёхзначный код комнаты. Вставьте полный код из профиля."
+        />
+        {error ? (
+          <Notice title="ПЕРЕНОС НЕ ВЫПОЛНЕН" tone="warning">
+            {error}
+          </Notice>
+        ) : null}
+        {error ? (
+          <Body muted>
+            Если связь пропала после отправки, код мог уже использоваться. Создайте новый на
+            исходном устройстве. Текущий профиль здесь не изменится без успешного ответа.
+          </Body>
+        ) : null}
+        {user ? (
+          <>
+            <Notice title="ПРОФИЛИ НЕ ОБЪЕДИНЯЮТСЯ" tone="warning">
+              Сейчас вы вошли как {user.name}. Будет открыт профиль из кода; его комнаты и голоса
+              заменят текущий список. Для возврата сохраните доступ к нынешнему профилю на другом
+              устройстве.
+            </Notice>
+            <Button
+              variant="secondary"
+              disabled={busy || confirmed}
+              onPress={() => setConfirmed(true)}
+            >
+              {confirmed ? 'Переключение подтверждено' : 'Понимаю, переключить профиль'}
+            </Button>
+          </>
+        ) : null}
+      </View>
+    </Screen>
+  );
+}
+
+export function RecoveryScreen({ reason, onRetry }) {
+  return (
+    <Screen footer={<Button onPress={onRetry}>Попробовать снова</Button>}>
+      <Header center="НЕТ СВЯЗИ С СЕРВЕРОМ" />
+      <PageIntro
+        label="ЗАГРУЗКА НЕ ЗАВЕРШЕНА"
+        title="Не удалось открыть приложение."
+        description={reason || 'Проверьте соединение и повторите попытку.'}
+      />
+      <Notice title="СОХРАНЁННЫЙ ПРОФИЛЬ НЕ УДАЛЁН">
+        Временный сбой не создаёт нового гостя. Повторим загрузку с прежней сессией и исходным
+        приглашением.
+      </Notice>
     </Screen>
   );
 }
@@ -432,6 +621,14 @@ const styles = StyleSheet.create({
   miniHint: { marginTop: 18, marginBottom: 18 },
   spacedButton: { marginTop: 10 },
   accountCard: { marginTop: 44 },
+  transferSection: { marginTop: 28, gap: 18, paddingBottom: 20 },
+  transferCode: {
+    color: colors.text,
+    fontFamily: fonts.mono,
+    fontSize: 17,
+    lineHeight: 25,
+    marginVertical: 16,
+  },
   codeSection: { marginTop: 76 },
   codeInput: {
     height: 112,

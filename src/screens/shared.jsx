@@ -62,7 +62,13 @@ export function Topline({ room, center, onAccount }) {
       <Text style={styles.topCenter} numberOfLines={2}>
         {center || (room ? meeting(room.constraints).toUpperCase() : 'СЕГОДНЯ · 19:30')}
       </Text>
-      <Pressable onPress={onAccount} style={styles.topRight} accessibilityRole="button">
+      <Pressable
+        onPress={onAccount}
+        disabled={!onAccount}
+        style={styles.topRight}
+        accessibilityRole={onAccount ? 'button' : undefined}
+        accessibilityLabel={onAccount ? 'Открыть профиль' : undefined}
+      >
         <Text style={styles.topRightText}>{room ? `КОД: ${room.code || '—'}` : 'КУДА ↗'}</Text>
       </Pressable>
     </View>

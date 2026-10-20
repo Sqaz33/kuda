@@ -1,4 +1,12 @@
-export { HomeScreen, AuthScreen, AccountScreen, JoinCodeScreen, PreviewScreen } from './entry';
+export {
+  HomeScreen,
+  AuthScreen,
+  AccountScreen,
+  JoinCodeScreen,
+  PreviewScreen,
+  TransferScreen,
+  RecoveryScreen,
+} from './entry';
 export { CreateScreen } from './create';
 export {
   LobbyScreen,

@@ -417,10 +417,12 @@ export function DeckScreen({
         </Overlay>
       ) : null}
       {confirmExit ? (
-        <Overlay title="Выйти из комнаты?" onClose={() => setConfirmExit(false)}>
-          <Body muted>Ваши ответы сохранятся. Вы сможете вернуться по коду комнаты.</Body>
+        <Overlay title="Вернуться на главную?" onClose={() => setConfirmExit(false)}>
+          <Body muted>
+            Вы останетесь участником. Голоса сохранятся, комнату можно открыть из списка на главной.
+          </Body>
           <Button variant="secondary" onPress={onBack}>
-            Выйти
+            На главную
           </Button>
           <Button variant="quiet" onPress={() => setConfirmExit(false)}>
             Остаться
@@ -468,6 +470,7 @@ export function WaitingScreen({ room, user, onBack, onFinish, onCancel }) {
           </Eyebrow>
         </View>
       </Card>
+      <BackLink onPress={onBack} />
     </Screen>
   );
 }
@@ -833,9 +836,27 @@ export function DetailsScreen({ venue, room, onBack, onVote, onFinishEarly, onRe
   );
 }
 
-export function UnavailableScreen({ reason, onHome }) {
+export function UnavailableScreen({ reason, onHome, onRetry, onJoin, busy }) {
   return (
-    <Screen footer={<Button onPress={onHome}>На главную</Button>}>
+    <Screen
+      footer={
+        <>
+          {onRetry ? (
+            <Button loading={busy} onPress={onRetry}>
+              Повторить открытие приглашения
+            </Button>
+          ) : null}
+          {onJoin ? (
+            <Button variant="secondary" disabled={busy} onPress={onJoin}>
+              Ввести другой код комнаты
+            </Button>
+          ) : null}
+          <Button variant="quiet" disabled={busy} onPress={onHome}>
+            На главную
+          </Button>
+        </>
+      }
+    >
       <Header center="КОМНАТА НЕДОСТУПНА" />
       <PageIntro
         label="ССЫЛКА НЕ РАБОТАЕТ"

@@ -20,6 +20,8 @@ import {
   MatchesScreen,
   PreviewScreen,
   ResultScreen,
+  RecoveryScreen,
+  TransferScreen,
   UnavailableScreen,
   WaitingScreen,
 } from './src/screens';
@@ -38,6 +40,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [mini, setMini] = useState(null);
   const [rooms, setRooms] = useState([]);
+  const [roomsStatus, setRoomsStatus] = useState('idle');
+  const [roomsError, setRoomsError] = useState('');
+  const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
+  const [transferOrigin, setTransferOrigin] = useState('auth');
+  const [retryInviteToken, setRetryInviteToken] = useState(null);
   const [room, setRoom] = useState(null);
   const [preview, setPreview] = useState(null);
   const [previewOrigin, setPreviewOrigin] = useState('home');
@@ -48,6 +55,7 @@ export default function App() {
   const [offline, setOffline] = useState(false);
   const roomRef = useRef(null);
   const busyRef = useRef(false);
+  const roomsRequestRef = useRef(0);
 
   function showError(cause) {
     setError(
@@ -77,18 +85,29 @@ export default function App() {
     if (!keepDetails) setScreen(roomScreen(next));
   }
   async function refreshRooms() {
+    const requestId = ++roomsRequestRef.current;
     if (!hasToken()) {
       setRooms([]);
+      setRoomsStatus('idle');
+      setRoomsError('');
       return;
     }
+    setRoomsStatus('loading');
+    setRoomsError('');
     try {
-      setRooms(await api.rooms());
-    } catch {
-      /* Home can still be used offline. */
+      const next = await api.rooms();
+      if (requestId !== roomsRequestRef.current) return;
+      setRooms(next);
+      setRoomsStatus('success');
+    } catch (cause) {
+      if (requestId !== roomsRequestRef.current || cause.code === 'SESSION_CHANGED') return;
+      setRoomsStatus('error');
+      setRoomsError(cause.message);
     }
   }
   async function openInvite(token) {
     if (!token) return;
+    setRetryInviteToken(null);
     try {
       const next = await api.preview(token);
       setPreview(next);
@@ -97,6 +116,8 @@ export default function App() {
       void api.track('invite_opened', { roomId: next.room.id }).catch(() => {});
     } catch (cause) {
       setError(cause.message);
+      if (!cause.status || cause.status >= 500 || cause.status === 429 || cause.status === 401)
+        setRetryInviteToken(token);
       setScreen('unavailable');
     }
   }
@@ -118,6 +139,7 @@ export default function App() {
       subscribeUnauthorized(() => {
         roomRef.current = null;
         setRoom(null);
+        roomsRequestRef.current++;
         setRooms([]);
         setUser(null);
         setOffline(false);
@@ -173,7 +195,7 @@ export default function App() {
       } catch (cause) {
         if (mounted) {
           showError(cause);
-          setScreen('home');
+          setScreen('recovery');
         }
       }
     }
@@ -186,7 +208,7 @@ export default function App() {
       mounted = false;
       listener.remove();
     };
-  }, []);
+  }, [bootstrapAttempt]);
 
   useEffect(() => {
     if (!room?.id || !['lobby', 'deck', 'waiting', 'matches', 'result', 'details'].includes(screen))
@@ -235,6 +257,7 @@ export default function App() {
     roomRef.current = null;
     setRoom(null);
     setPreview(null);
+    setRetryInviteToken(null);
     setError('');
     setScreen('home');
     await refreshRooms();
@@ -268,11 +291,27 @@ export default function App() {
       /* Local sign-out still proceeds. */
     }
     await saveToken(null);
+    roomsRequestRef.current++;
     roomRef.current = null;
     setUser(null);
     setRooms([]);
     setRoom(null);
     setScreen('home');
+  }
+  function openTransfer(origin) {
+    setError('');
+    setTransferOrigin(origin);
+    setScreen('transfer');
+  }
+  async function exchangeProfile(code) {
+    await run(async () => {
+      const auth = await api.exchange(code);
+      await saveToken(auth.token);
+      roomsRequestRef.current++;
+      setRooms([]);
+      setUser(auth.user);
+      await goHome();
+    });
   }
   async function createRoom(constraints, name) {
     await run(async () => {
@@ -401,6 +440,9 @@ export default function App() {
         onJoin={() => setScreen('join')}
         onAuth={() => setScreen(user ? 'account' : 'auth')}
         onOpen={openRoom}
+        roomsStatus={roomsStatus}
+        roomsError={roomsError}
+        onRetryRooms={refreshRooms}
       />
     );
   else if (screen === 'auth')
@@ -412,6 +454,7 @@ export default function App() {
         onMini={authenticateMini}
         mini={mini}
         busy={busy}
+        onTransfer={() => openTransfer('auth')}
       />
     );
   else if (screen === 'account')
@@ -420,7 +463,34 @@ export default function App() {
         user={user}
         onBack={goHome}
         onLogout={logout}
-        onAuth={() => setScreen('auth')}
+        onCreateTransfer={() => run(() => api.transfer())}
+        onTransfer={() => openTransfer('account')}
+        busy={busy}
+        error={error}
+      />
+    );
+  else if (screen === 'transfer')
+    content = (
+      <TransferScreen
+        user={user}
+        onBack={() => {
+          setError('');
+          setScreen(transferOrigin);
+        }}
+        onExchange={exchangeProfile}
+        busy={busy}
+        error={error}
+      />
+    );
+  else if (screen === 'recovery')
+    content = (
+      <RecoveryScreen
+        reason={error}
+        onRetry={() => {
+          setError('');
+          setScreen('loading');
+          setBootstrapAttempt((attempt) => attempt + 1);
+        }}
       />
     );
   else if (screen === 'create')
@@ -527,13 +597,16 @@ export default function App() {
               : 'Комната закрыта или срок встречи прошёл.')
         }
         onHome={goHome}
+        onRetry={retryInviteToken ? () => run(() => openInvite(retryInviteToken)) : null}
+        onJoin={() => setScreen('join')}
+        busy={busy}
       />
     );
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
       {content}
-      {screen !== 'loading' && error && screen !== 'unavailable' ? (
+      {error && !['loading', 'unavailable', 'recovery', 'transfer', 'account'].includes(screen) ? (
         <View pointerEvents="box-none" style={styles.toastContainer}>
           <Pressable onPress={() => setError('')} style={styles.toast}>
             <Text style={styles.toastText}>{error} ×</Text>

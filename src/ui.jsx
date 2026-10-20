@@ -59,8 +59,12 @@ export function Eyebrow({ children, style }) {
   return <Text style={[common.label, style]}>{children}</Text>;
 }
 
-export function Body({ children, muted = false, style }) {
-  return <Text style={[muted ? common.muted : common.body, style]}>{children}</Text>;
+export function Body({ children, muted = false, style, ...props }) {
+  return (
+    <Text {...props} style={[muted ? common.muted : common.body, style]}>
+      {children}
+    </Text>
+  );
 }
 
 export function Card({ children, style }) {
@@ -174,7 +178,7 @@ export function Chips({ options, value, onChange, multiple = false }) {
 
 export function Notice({ title, children, tone = 'neutral' }) {
   return (
-    <View style={styles.notice}>
+    <View style={styles.notice} accessibilityRole={tone === 'warning' ? 'alert' : undefined}>
       {title ? (
         <View style={styles.noticeTitleRow}>
           <View style={[styles.noticeDot, tone === 'warning' && { backgroundColor: colors.red }]} />
